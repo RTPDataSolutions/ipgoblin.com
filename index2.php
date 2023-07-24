@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+
+<title>IP Goblin - let the goblins find your public IP </title>
+
 <!-- Add Clipboard.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
 <!-- Add FontAwesome -->
@@ -21,6 +24,7 @@
     text-align: center;
     padding: 20px 0;
     font-size: 2em;
+    font-family: 'Comics', sans-serif;
     animation: flashing 1s linear infinite;
     z-index: 9999;
 }
@@ -39,7 +43,7 @@
     font-size: 12px;
     font-family: 'Courier New', monospace;
     width: 300px;
-    height: auto;
+    height: 100px;
     overflow: auto;
 }
 .copy-btn {
@@ -65,19 +69,21 @@
 </head>
 
 <body>
-<div id="banner">
-    Your IP is: <?php
-    $ip = $_SERVER['REMOTE_ADDR'];
-    echo $ip;
-    ?>
-</div>
-
-<center style="padding-top: 70px;">
 <?php
+$ip = $_SERVER['REMOTE_ADDR'];
 $details = json_decode(file_get_contents("http://ipinfo.io/{$ip}/json"));
+$countryCode = strtoupper($details->country);
+$countryDetails = json_decode(file_get_contents("https://restcountries.com/v3.1/alpha/{$countryCode}"));
+$flagUrl = $countryDetails[0]->flags->png;
 ?>
 
-<h1>~ IP GOBLIN ~</h1>
+<div id="banner">
+    <img src="<?php echo $flagUrl; ?>" width="50" height="30">
+    <?php echo $ip; ?>
+    <img src="<?php echo $flagUrl; ?>" width="50" height="30">
+</div>
+
+<center style="padding-top: 70px; padding-bottom: 70px;">
 
         <table>
             <tr>
@@ -85,9 +91,7 @@ $details = json_decode(file_get_contents("http://ipinfo.io/{$ip}/json"));
                     <img src="https://ipgoblin.com/ColossalSophisticatedGreatdane-max-1mb.gif">
                 </td>
                 <td>
-
-                   <h2>Your IP Address:</h2>
-
+                    <h4>Your public IP Address:</h4>
                     <div id="ip-address-container">
                         <input type="text" value="<?php echo $ip; ?>" id="ip-address" readonly>
 
@@ -100,7 +104,7 @@ $details = json_decode(file_get_contents("http://ipinfo.io/{$ip}/json"));
 
                     <hr>
 
-                    <h2>More Details:</h2>
+                    <h4>More Details:</h4>
 
                     <div id="details-container">
                         <textarea id="details" readonly><?php 
