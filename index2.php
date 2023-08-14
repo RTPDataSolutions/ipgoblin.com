@@ -68,7 +68,7 @@
 </style>
 </head>
 
-<body>
+<body style="background-color: #4B5320;">
 <?php
 $ip = $_SERVER['REMOTE_ADDR'];
 $details = json_decode(file_get_contents("http://ipinfo.io/{$ip}/json"));
@@ -193,12 +193,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 } else {
     // The form to capture the target IP or domain
     echo '<form action="" method="post">
-        Target: <input type="text" value="$ip" name="target"><br>
+        Target: <input type="text" value="<?php $ip ?>" name="target"><br>
         <input type="submit">
     </form>';
 }
 ?>
 
+<img src="fotor-ai-20230530145810.jpg" height="auto" width="400">
 </center>
 
 <!-- Initialize Clipboard -->
