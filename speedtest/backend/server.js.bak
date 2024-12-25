@@ -1,0 +1,33 @@
+const express = require('express');
+const cors = require('cors');
+const speedTest = require('speedtest-net');
+
+const app = express();
+const PORT = 3000;
+
+app.use(cors());
+
+app.get('/speedtest', async (req, res) => {
+  try {
+    // Run the speed test
+    const result = await speedTest({
+      acceptLicense: true,
+      acceptGdpr: true,
+    });
+
+    // Send the test results to the client
+    res.json({
+      ping: result.ping.latency,
+      download: result.download.bandwidth / 125000, // Convert from bytes/s to Mbps
+      upload: result.upload.bandwidth / 125000, // Convert from bytes/s to Mbps
+    });
+  } catch (error) {
+    console.error('Speedtest error:', error);
+    res.status(500).json({ error: 'Speed test failed' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Speed test server running on http://localhost:${PORT}`);
+});
+

@@ -1,0 +1,44 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const startButton = document.getElementById('start-test');
+    const speedDisplay = document.getElementById('speed-display');
+    const pingElement = document.getElementById('ping');
+    const downloadElement = document.getElementById('download');
+    const uploadElement = document.getElementById('upload');
+
+    function startSpeedTest() {
+        speedDisplay.textContent = 'Testing...';
+
+        // Fetch the speed test results from the backend
+        fetch('/api/speedtest')
+            .then(response => {
+                console.log('Response:', response);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Data received:', data);
+
+                // Extract and display results
+                const { ping, download, upload } = data;
+
+                // Ensure accurate conversions
+                const pingMs = ping.toFixed(2); // Ping in milliseconds
+                const downloadMbps = (download).toFixed(2); // Download in Mbps
+                const uploadMbps = (upload).toFixed(2); // Upload in Mbps
+
+                pingElement.textContent = `${pingMs} ms`;
+                downloadElement.textContent = `${downloadMbps} Mbps`;
+                uploadElement.textContent = `${uploadMbps} Mbps`;
+                speedDisplay.textContent = 'Speed Test Complete!';
+            })
+            .catch(error => {
+                console.error('Error during speed test:', error);
+                speedDisplay.textContent = 'Error: Unable to run speed test.';
+            });
+    }
+
+    startButton.addEventListener('click', startSpeedTest);
+});
+

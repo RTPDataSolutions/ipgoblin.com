@@ -1,0 +1,103 @@
+/* General Styling */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  text-align: center;
+  padding: 20px;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+}
+
+/* Heading and Button */
+h1 {
+  font-size: 24px;
+  color: #444;
+  margin-bottom: 20px;
+}
+
+#start-test {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+#start-test:hover {
+  background-color: #45a049;
+}
+
+/* Track and Goblin */
+.track {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  margin: 20px 0;
+  background: linear-gradient(to right, #87ceeb, #90ee90);
+  border-radius: 10px;
+  overflow: hidden; /* Ensures the goblin doesn't appear outside the track */
+  border: 2px solid #444;
+}
+
+#goblin {
+  position: absolute;
+  height: 80px;
+  top: 10px;
+  left: 0; /* Start at the beginning of the track */
+  transition: left 2s linear; /* Smoothly transition left property */
+}
+
+#goblin.running {
+  left: calc(100% - 80px); /* Move goblin to the right end of the track */
+}
+
+/* Speed Display */
+#speed-display {
+  font-size: 18px;
+  color: #555;
+  margin-top: 10px;
+}
+
+/* Results Section */
+#results {
+  margin-top: 20px;
+  font-size: 18px;
+  color: #333;
+  text-align: left;
+}
+
+#results p {
+  margin: 5px 0;
+}
+
+/* Progress Bar */
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  background: #ddd;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 10px 0;
+  position: relative;
+}
+
+.progress {
+  height: 100%;
+  width: 0;
+  background: #4caf50;
+  transition: width 0.2s;
+}
+
+/* Footer (Optional) */
+footer {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #777;
+}
+

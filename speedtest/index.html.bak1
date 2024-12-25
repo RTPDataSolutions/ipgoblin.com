@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IP Goblin Speed Test</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>IP Goblin Speed Test</h1>
+    <button id="start-test">Start Speed Test</button>
+    <div class="track">
+      <img src="assets/goblin.png" id="goblin" alt="Running Goblin">
+    </div>
+    <p id="speed-display">Click "Start Speed Test" to see your results.</p>
+    <div id="results">
+      <p>Ping: <span id="ping">-</span> ms</p>
+      <p>Download: <span id="download">-</span> Mbps</p>
+      <p>Upload: <span id="upload">-</span> Mbps</p>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
+

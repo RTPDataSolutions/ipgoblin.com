@@ -1,0 +1,99 @@
+/* General Styling */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  text-align: center;
+  padding: 20px;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+}
+
+/* Heading and Button */
+h1 {
+  font-size: 24px;
+  color: #444;
+  margin-bottom: 20px;
+}
+
+#start-test {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+#start-test:hover {
+  background-color: #45a049;
+}
+
+/* Track and Goblin */
+.track {
+  position: relative;
+  width: 100%;
+  height: 128px;
+  margin: 20px 0;
+  background: linear-gradient(to right, #87ceeb, #90ee90);
+  border-radius: 10px;
+  overflow: hidden; /* Ensures the goblin doesn't appear outside the track */
+  border: 2px solid #444;
+}
+
+#goblin {
+  position: absolute;
+  top: 0;
+  left: 0; /* Start at the beginning of the track */
+  width: 128px; /* Width of a single sprite frame */
+  height: 128px; /* Height of a single sprite frame */
+  background: url('assets/goblin-sprite.png') 0 0 no-repeat; /* Sprite sheet */
+  background-size: 1024px 128px; /* Total size of the sprite sheet */
+  animation: goblin-run 1s steps(8) infinite; /* 8 frames in sprite sheet */
+  transition: left 10s linear; /* Animation for moving across the track */
+}
+
+#goblin.running {
+  left: calc(100% - 128px); /* Move goblin to the end of the track */
+}
+
+/* Goblin Running Animation */
+@keyframes goblin-run {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -1024px 0; /* Total width of the sprite sheet */
+  }
+}
+
+/* Speed Display */
+#speed-display {
+  font-size: 18px;
+  color: #555;
+  margin-top: 10px;
+}
+
+/* Results Section */
+#results {
+  margin-top: 20px;
+  font-size: 18px;
+  color: #333;
+  text-align: left;
+}
+
+#results p {
+  margin: 5px 0;
+}
+
+/* Footer (Optional) */
+footer {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #777;
+}
+
