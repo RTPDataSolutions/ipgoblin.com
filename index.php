@@ -1,163 +1,211 @@
-
+<!DOCTYPE html>
 <html>
 <head>
 
+<title>IP Goblin - let the goblins find your public IP </title>
+
+<!-- Add Clipboard.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
+<!-- Add FontAwesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css">
+
 <style>
-
-body {
-background-color: #00;
+@keyframes flashing {
+    0%   {background-color: pink;}
+    50%  {background-color: lime;}
+    100% {background-color: pink;}
 }
 
-div.boxed {
-  font-family: "Comic Sans MS", cursive, sans-serif;
-  background-color: #5b8249;
-  width: 600px;
-  text-align: center;
-}
-.divTable.boxed .divTableCell, .divTable.boxed .divTableHead {
-}
-.divTable.boxed .divTableBody .divTableCell {
-  font-size: 20px;
-  font-weight: bold;
-  color: #FFFFFF;
-}
-.boxed .tableFootStyle {
-  font-size: 14px;
-}
-.boxed .tableFootStyle .links {
-     text-align: right;
-}
-.boxed .tableFootStyle .links a{
-  display: inline-block;
-  background: #1C6EA4;
-  color: #FFFFFF;
-  padding: 2px 8px;
-  border-radius: 5px;
-}
-.boxed.outerTableFooter {
-  border-top: none;
-}
-.boxed.outerTableFooter .tableFootStyle {
-  padding: 3px 5px; 
-}
-.divTable{ display: table; }
-.divTableRow { display: table-row; }
-.divTableHeading { display: table-header-group;}
-.divTableCell, .divTableHead { display: table-cell;}
-.divTableHeading { display: table-header-group;}
-.divTableFoot { display: table-footer-group;}
-.divTableBody { display: table-row-group;}
-
-.p {
-color: #00;
-font-family: Verdana;
-font-size: 20px;
-
+#banner {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    color: white;
+    text-align: center;
+    padding: 20px 0;
+    font-size: 2em;
+    font-family: 'Comics', sans-serif;
+    animation: flashing 1s linear infinite;
+    z-index: 9999;
 }
 
-.h1 {
-color: #00;
-font-family: Arial;
-font-size: 40px;
+#ip-address-container, #details-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
-
-.ipstyle {
-color: #0099FF;
-font-size: 50px;
-border-radius: 5px;
-font-family: "Comic Sans MS";
+#ip-address {
+    font-size: 24px;
+    font-family: 'Courier New', monospace;
+    flex-grow: 1;
 }
-
-.btn {
-  -webkit-border-radius: 5;
-  -moz-border-radius: 5;
-  border-radius: 5px;
-  -webkit-box-shadow: 0px 1px 3px #666666;
-  -moz-box-shadow: 0px 1px 3px #666666;
-  box-shadow: 0px 1px 3px #666666;
-  font-family: Arial;
-  color: #25b800;
-  font-size: 60px;
-  background: #000000;
-  padding: 10px 20px 10px 20px;
-  border: dashed #ff0000 10px;
-  text-decoration: none;
+#details {
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    width: 300px;
+    height: 100px;
+    overflow: auto;
 }
-
-.btn:hover {
-  background: #ffd500;
-  text-decoration: none;
+.copy-btn {
+    display: inline-block;
 }
-
-.terminal-style {
-  background-color: #000000;
-  color: #00FF00;
-  font-family: 'Courier New', Courier, monospace;
+#command {
+    font-family: 'Courier New', monospace;
+    color: green;
+    background-color: black;
+    padding: 10px;
+    display: inline-block;
 }
-
+#command-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+.center-text {
+    text-align: center;
+}
 </style>
-
 </head>
 
-<body>
-<center>
-
+<body style="background-color: #4B5320;">
 <?php
 $ip = $_SERVER['REMOTE_ADDR'];
 $details = json_decode(file_get_contents("http://ipinfo.io/{$ip}/json"));
+$countryCode = strtoupper($details->country);
+$countryDetails = json_decode(file_get_contents("https://restcountries.com/v3.1/alpha/{$countryCode}"));
+$flagUrl = $countryDetails[0]->flags->png;
 ?>
 
-<h1>IP GOBLIN ~</h1>
-<h2>
+<div id="banner">
+    <img src="<?php echo $flagUrl; ?>" width="50" height="30">
+    <?php echo $ip; ?>
+    <img src="<?php echo $flagUrl; ?>" width="50" height="30">
+</div>
 
-<div class="btn">
+<center style="padding-top: 70px; padding-bottom: 70px;">
+
+        <table>
+            <tr>
+                <td>
+                    <img src="https://ipgoblin.com/ColossalSophisticatedGreatdane-max-1mb.gif">
+                </td>
+                <td>
+                    <h4>Your public IP Address:</h4>
+                    <div id="ip-address-container">
+                        <input type="text" value="<?php echo $ip; ?>" id="ip-address" readonly>
+
+                       <!-- Add button to copy content to clipboard -->
+
+                       <button class="copy-btn" data-clipboard-target="#ip-address">
+                         <i class="fas fa-clipboard"></i>
+                       </button>
+                    </div>
+
+                    <hr>
+
+                    <h4>More Details:</h4>
+
+                    <div id="details-container">
+                        <textarea id="details" readonly><?php 
+                            echo "Hostname: $details->hostname \r\n";
+                            echo "IP Address: $details->ip \r\n";
+                            echo "City: $details->city \r\n";
+                            echo "State or Province: $details->region \r\n";
+                            echo "Country: $details->country \r\n";
+                            echo "Coordinates: $details->loc \r\n";
+                            echo "Your ISP: $details->org \r\n";
+                        ?></textarea>
+                        
+                        <!-- Add button to copy content to clipboard -->
+
+                        <button class="copy-btn" data-clipboard-target="#details">
+                            <i class="fas fa-clipboard"></i>
+                        </button>
+                    </div>
+
+                </td>
+                <td>
+                    <img src="https://ipgoblin.com/CreepyAnotherFrillneckedlizard-max-1mb.gif">
+                </td>
+            </tr>
+        </table>
+
+Use the API to get your IP address:
+
+<div class="center-text">
+    <div id="command-container">
+        <span id="command">curl -L api.ipgoblin.com</span> 
+        <button class="copy-btn" data-clipboard-target="#command">
+          <i class="fas fa-clipboard"></i>
+        </button>
+    </div>
+</div>
+
+<hr>
+
+Perform a trace:
 <?php
-echo $ip;
+// Define the maximum number of requests and the time period
+define('MAX_REQUESTS', 5);
+define('TIME_PERIOD', 3600);
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $target = $_POST['target'];
+
+    // Validate the target as an IP address or domain
+    if (filter_var($target, FILTER_VALIDATE_IP) || filter_var(gethostbyname($target), FILTER_VALIDATE_IP)) {
+        // Get the client IP
+        $clientIp = $_SERVER['REMOTE_ADDR'];
+
+        // Get the file for the client's IP
+        $filename = "rate_limit/{$clientIp}.txt";
+
+        // Read the request data for the client
+        $requestData = @file_get_contents($filename);
+        $data = $requestData ? json_decode($requestData, true) : null;
+
+        // If there's no data or the data is old, reset the request count
+        if (!$data || $data['time'] < time() - TIME_PERIOD) {
+            $data = ['count' => 0, 'time' => time()];
+        }
+
+        // If the request count is over the maximum, deny the request
+        if ($data['count'] >= MAX_REQUESTS) {
+            echo 'Rate limit exceeded!';
+        } else {
+            // Increment the request count and save the data
+            $data['count']++;
+            file_put_contents($filename, json_encode($data));
+
+            // Sanitize the target
+            $sanitized_target = escapeshellarg($target);
+
+            // Run the traceroute command
+            $output = shell_exec('traceroute ' . $sanitized_target);
+
+            // Output the results
+            echo '<pre>' . htmlspecialchars($output, ENT_QUOTES) . '</pre>';
+        }
+    } else {
+        echo 'Invalid target!';
+    }
+} else {
+    // The form to capture the target IP or domain
+    echo '<form action="" method="post">
+        Target: <input type="text" value="<?php $ip ?>" name="target"><br>
+        <input type="submit">
+    </form>';
+}
 ?>
-</div>
-</h2>
- 
-<div align="center">
 
-<img src="https://ipgoblin.com/ColossalSophisticatedGreatdane-max-1mb.gif">
-<img src="https://ipgoblin.com/CreepyAnotherFrillneckedlizard-max-1mb.gif">
-
-
-<div class="divTableBody">
-
-<div class="divTableRow">
-Use the API to get your IP address
-</div>
-<div class="divTableRow">
-<div class="terminal-style"> 
-  curl -L api.ipgoblin.com 
-</div>
-</div> 
-</div>
-
-<div class="divTable boxed">
-<div class="divTableBody">
-<div class="divTableRow">
-
-<?php 
-echo nl2br("Hostname: $details->hostname \r\n");
-echo nl2br("IP Address: $details->ip \r\n");
-echo nl2br("City: $details->city \r\n");
-echo nl2br("State or Province: $details->region \r\n");
-echo nl2br("Country: $details->country \r\n");
-echo nl2br("Coordinates: $details->loc \r\n");
-echo nl2br("Your ISP: $details->org \r\n");
-?>
-
-</div></div>
-</div>
-</div>
-
+<img src="fotor-ai-20230530145810.jpg" height="auto" width="400">
 </center>
-&nbsp;
-&nbsp;
 
+<!-- Initialize Clipboard -->
+<script>
+var clipboard = new ClipboardJS('.copy-btn');
+</script>
 
 </body>
 </html>
-
