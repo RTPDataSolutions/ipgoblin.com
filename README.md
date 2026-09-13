@@ -40,9 +40,25 @@ reference; they are not deployed.
 `.github/workflows/pages.yml` publishes `site/` to GitHub Pages on every push to `master` that
 touches it, and can also be run manually from the Actions tab.
 
+That workflow needs GitHub Actions to be available on the organisation account. While Actions is
+unavailable — jobs fail with *"the job was not started because your account is locked due to a
+billing issue"* — Pages is instead served from the `gh-pages` branch, which holds the contents of
+`site/` at its root. Publish changes with:
+
+```sh
+./scripts/publish-gh-pages.sh
+```
+
+Once Actions works again, switch Pages back to the workflow build:
+
+```sh
+gh api -X PUT repos/RTPDataSolutions/ipgoblin.com/pages -f build_type=workflow
+```
+
 ### DNS for ipgoblin.com
 
-Point the apex at GitHub Pages:
+Point the apex at GitHub Pages. The records below are live at Dynadot (the AAAA records are
+optional and are not currently set):
 
 ```
 A     @   185.199.108.153
