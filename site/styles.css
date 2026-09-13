@@ -239,7 +239,7 @@ body {
 
 /* ---------- terminal ---------- */
 
-.terminal-section { margin: 40px auto 0; max-width: 620px; }
+.terminal-section { margin: 40px auto 0; max-width: 720px; }
 .terminal-row { justify-content: center; }
 
 .command {
@@ -252,6 +252,20 @@ body {
   font-size: 1rem;
   overflow-x: auto;
   white-space: nowrap;
+}
+
+.terminal-hint {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.terminal-hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--slime);
 }
 
 /* ---------- footer ---------- */
@@ -295,6 +309,7 @@ body {
   .stage { flex-wrap: wrap; }
   .card { order: -1; flex-basis: 100%; }
   .goblin { width: min(190px, 40vw); }
+  .command { font-size: 0.85rem; padding: 12px 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

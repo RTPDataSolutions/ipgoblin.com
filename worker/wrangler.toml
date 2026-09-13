@@ -1,0 +1,11 @@
+name = "ipgoblin-api"
+main = "src/index.js"
+compatibility_date = "2026-09-04"
+
+workers_dev = true
+
+# Once ipgoblin.com is served by Cloudflare DNS, uncomment this to serve the
+# API from api.ipgoblin.com as well as the workers.dev subdomain.
+# [[routes]]
+# pattern = "api.ipgoblin.com"
+# custom_domain = true

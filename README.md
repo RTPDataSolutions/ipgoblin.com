@@ -73,3 +73,59 @@ CNAME www rtpdatasolutions.github.io.
 ```
 
 Then enable **Enforce HTTPS** in the repository's Pages settings.
+
+## The API
+
+`worker/` is a Cloudflare Worker that reports the caller's IP and location. It reads
+`CF-Connecting-IP` and `request.cf` straight off the edge request, so there are no upstream API
+calls, no keys and no rate limits beyond the Workers free tier (100k requests/day).
+
+Live at **https://ipgoblin-api.melanie-stewart.workers.dev**.
+
+| Endpoint | Returns |
+| --- | --- |
+| `/` | your IP address, plain text |
+| `/json` | every field below as JSON |
+| `/ip` | your IP address |
+| `/version` | `IPv4` or `IPv6` |
+| `/country` | ISO 3166-1 alpha-2 code |
+| `/country-name` | country name |
+| `/flag` | country flag emoji |
+| `/city` | city |
+| `/region` | region / state |
+| `/timezone` | IANA timezone |
+| `/asn` | autonomous system number |
+| `/isp` | network operator |
+| `/colo` | Cloudflare edge that served the request |
+| `/taunt` | a personalised goblin insult |
+| `/headers` | the request headers received |
+| `/help` | usage |
+
+```sh
+curl -L ipgoblin-api.melanie-stewart.workers.dev
+curl -L ipgoblin-api.melanie-stewart.workers.dev/json | jq .
+curl -4 -L ipgoblin-api.melanie-stewart.workers.dev   # force IPv4
+```
+
+CORS is open, so the site itself can call it from the browser.
+
+### Working on the API
+
+```sh
+cd worker
+npx wrangler dev      # local, on http://127.0.0.1:8787
+npx wrangler deploy   # publish
+npx wrangler tail     # live logs
+```
+
+### Moving the API to api.ipgoblin.com
+
+Workers custom domains only work when Cloudflare is authoritative for the zone, and ipgoblin.com
+currently uses Dynadot DNS. To switch:
+
+1. Add ipgoblin.com to a Cloudflare account and let it import the existing records.
+2. Confirm the four `185.199.*.153` A records and the `www` CNAME came across, set to **DNS only**
+   (grey cloud) so GitHub Pages keeps serving the apex and its certificate.
+3. Change the nameservers at Dynadot to the pair Cloudflare provides.
+4. Uncomment the `[[routes]]` block in `worker/wrangler.toml` and run `npx wrangler deploy`.
+5. Update the `curl` command in `site/index.html` and the URLs above.
