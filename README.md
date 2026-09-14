@@ -14,6 +14,28 @@
 
 ---
 
+## What is in here
+
+| Path | What it is |
+| --- | --- |
+| `site/` | The static site published to [ipgoblin.com](https://ipgoblin.com) |
+| `worker/` | Cloudflare Worker behind [api.ipgoblin.com](https://api.ipgoblin.com) |
+| `stats-worker/` | Cloudflare Worker behind `stats.ipgoblin.com`, password protected |
+| `scripts/` | Publish and reporting helpers |
+| `.github/workflows/pages.yml` | Pages deploy, currently blocked (see [Deploying](#deploying)) |
+| `speedtest/` | An unfinished 2023 speed-test tool with a Node backend. Not deployed, not referenced by anything above. |
+| `index.php`, `index2.php`, `index3.php`, `*.zip`, loose images | The original 2023 PHP site, kept for reference. Not deployed. |
+
+Three pieces, deployed independently:
+
+```
+ipgoblin.com        ->  Cloudflare  ->  GitHub Pages (gh-pages branch)  <- site/
+api.ipgoblin.com    ->  Cloudflare Worker "ipgoblin-api"                <- worker/
+stats.ipgoblin.com  ->  Cloudflare Worker "ipgoblin-stats"              <- stats-worker/
+```
+
+Cloudflare is authoritative for DNS and terminates TLS for all three.
+
 ## The site
 
 `site/` holds the static IP Goblin site that is published to GitHub Pages at
@@ -35,6 +57,15 @@ flag from [flagcdn](https://flagcdn.com). Nothing is stored server-side.
 The legacy `index.php` / `index2.php` / `index3.php` files are the old PHP versions kept for
 reference; they are not deployed.
 
+### Working on the site
+
+There is no build step. Open `site/index.html` directly, or serve the folder so the fetches
+behave the way they do in production:
+
+```sh
+cd site && python3 -m http.server 8799
+```
+
 ### Deploying
 
 `.github/workflows/pages.yml` publishes `site/` to GitHub Pages on every push to `master` that
@@ -48,6 +79,12 @@ billing issue"* — Pages is instead served from the `gh-pages` branch, which ho
 ```sh
 ./scripts/publish-gh-pages.sh
 ```
+
+That script copies `site/` to the `gh-pages` branch and asks Pages to rebuild. It also stamps
+`styles.css` and `app.js` references with a content hash, because Cloudflare caches those files at
+the edge for four hours and a plain redeploy would keep serving the old ones. HTML is never cached,
+so the new hashes take effect immediately. Only the published copy is rewritten; `site/` stays
+clean for local development.
 
 Once Actions works again, switch Pages back to the workflow build:
 
@@ -64,12 +101,13 @@ Cloudflare dashboard.
 The zone holds these records, all **proxied** (orange cloud):
 
 ```
-A     @   185.199.108.153
-A     @   185.199.109.153
-A     @   185.199.110.153
-A     @   185.199.111.153
-CNAME www rtpdatasolutions.github.io.
-CNAME api <worker custom domain, created by wrangler>
+A     @     185.199.108.153
+A     @     185.199.109.153
+A     @     185.199.110.153
+A     @     185.199.111.153
+CNAME www   rtpdatasolutions.github.io.
+CNAME api   <worker custom domain, created by wrangler>
+CNAME stats <worker custom domain, created by wrangler>
 ```
 
 Cloudflare terminates TLS with its own certificate for `ipgoblin.com` and reaches GitHub Pages
@@ -155,6 +193,25 @@ A password-protected dashboard, served by the `ipgoblin-stats` Worker in
 for a username and password: the username is `goblin`, the password is the
 `STATS_PASSWORD` secret. Add `?format=json` for the raw numbers.
 
+It shows four sections:
+
+  * **Traffic, last 7 days** — requests, page views, uniques and bytes per day.
+  * **Last 24 hours** — requests split by hostname and by country.
+  * **Visitor stream, last 24 hours** — one row per unique visitor.
+  * **API worker, last 24 hours** — `ipgoblin-api` requests and errors by status.
+
+The visitor stream collapses the edge data to one row per client IP, so
+somebody who requested twenty URLs is a single line with a hit count rather
+than twenty lines. Each row carries the hostname and IP, country, a shortened
+user agent, device type, hit count, how many distinct paths they touched, and
+when they were last seen.
+
+Hostnames are resolved live over DNS-over-HTTPS for the busiest visitors only,
+capped so the page stays inside the Worker subrequest budget. Most residential
+addresses have no PTR record and show as *no reverse DNS*; hosting providers
+and scanners usually do resolve, which is what makes the column worth having.
+Lookups are batched, individually timed out, and never fatal.
+
 It lives in its own Worker rather than as a route on `api.ipgoblin.com` so
 that the Cloudflare API token is not sitting on the public API surface. The
 token is only ever used server-side and never reaches the browser. The page
@@ -167,13 +224,23 @@ answers 503. Set them from `stats-worker/`:
     npx wrangler secret put STATS_PASSWORD
 
 `CF_API_TOKEN` is a Cloudflare API token created at
-<https://dash.cloudflare.com/profile/api-tokens> with exactly two read
-permissions, which are enough to read analytics and nothing else:
+<https://dash.cloudflare.com/profile/api-tokens> with **Create Custom Token**.
+The one in use is named `ipgoblin-stats-readonly` and carries exactly two
+read permissions, which are enough to read analytics and nothing else:
 
-  * Account -> Account Analytics -> Read
-  * Zone -> Zone Analytics -> Read
+  * Account -> **Account Analytics** -> Read
+  * Zone -> **Analytics** -> Read
 
-Deploy changes with `npx wrangler deploy` from `stats-worker/`.
+Note the second is listed as just *Analytics* once the group is set to Zone;
+there is no "Zone Analytics" entry in that group. Scope it to Account
+Resources *Include -> All accounts* and Zone Resources
+*Include -> Specific zone -> ipgoblin.com*.
+
+The token cannot change anything, cannot read logs, and cannot touch DNS. It
+is stored only as a Worker secret and is never committed.
+
+Deploy changes with `npx wrangler deploy` from `stats-worker/`, and check what
+is set with `npx wrangler secret list`.
 
 ### From the command line
 
@@ -186,12 +253,28 @@ it fails, run `npx wrangler login`.
 
 ### Notes
 
-The dashboard is also in Cloudflare under **ipgoblin.com -> Analytics & Logs
+The same data is in Cloudflare under **ipgoblin.com -> Analytics & Logs
 -> Traffic** and **Workers & Pages -> ipgoblin-api -> Metrics**.
 
-Free-plan limits: the daily dataset keeps 7 days, and the per-country dataset
-only answers for a 24-hour window. Both tools are written to those limits.
+Free-plan limits, which both tools are written to:
 
-These are aggregate edge counts, not visitor logs, so the site's "nothing is
-logged here" promise still holds. Note that a fair share of the non-US traffic
-is bots and scanners rather than people.
+  * the daily dataset keeps **7 days**;
+  * the detailed dataset behind the country split and the visitor stream only
+    answers for a **24-hour** window, so the visitor stream cannot look further
+    back than that;
+  * some fields are paid-only. Client ASN and referer host are not readable on
+    the free plan, which is why the visitor stream infers what it can from the
+    user agent and reverse DNS instead.
+
+On privacy: the site still runs no tracking code, sets no cookies, and stores
+nothing itself — the "nothing is logged here" promise on the page is about the
+site. The numbers here come from Cloudflare's own edge analytics, which every
+proxied request produces regardless. The daily and country sections are pure
+aggregates, but the visitor stream does show individual client IP addresses and
+resolved hostnames for the last 24 hours, so treat that page as sensitive and
+keep it behind its password.
+
+A fair share of the non-US traffic is bots and scanners rather than people. The
+visitor stream makes this obvious: look for agents like `l9scan`, `Baiduspider`
+or `zgrab`, hostnames under `scan.leakix.org`, and visitors whose path count is
+far higher than a human would ever produce.
