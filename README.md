@@ -72,9 +72,13 @@ CNAME www rtpdatasolutions.github.io.
 CNAME api <worker custom domain, created by wrangler>
 ```
 
-Cloudflare terminates TLS with its own Let's Encrypt certificate for `ipgoblin.com` and reaches
-GitHub Pages over HTTPS. The SSL/TLS encryption mode must stay on **Full** — GitHub Pages answers
-SNI for this host under a `*.github.io` certificate, so `Full (strict)` would fail.
+Cloudflare terminates TLS with its own certificate for `ipgoblin.com` and reaches GitHub Pages
+over HTTPS. Two zone settings matter:
+
+- **SSL/TLS encryption mode: Full.** GitHub Pages answers SNI for this host under a `*.github.io`
+  certificate, so `Full (strict)` would fail.
+- **Always Use HTTPS: on** (SSL/TLS → Edge Certificates). This is what makes plain `http://`
+  requests to the apex, `www` and `api` return a 301 to `https://`.
 
 GitHub never managed to issue its own certificate for the custom domain, so **Enforce HTTPS stays
 off in the repository's Pages settings**. Turning it on would break Cloudflare's connection to the
