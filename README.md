@@ -142,3 +142,26 @@ custom_domain = true
 
 `npx wrangler deploy` creates and maintains the matching DNS record in the Cloudflare zone, so
 there is nothing to add by hand. This only works while Cloudflare is authoritative for the zone.
+
+## Checking usage
+
+Cloudflare counts every request it proxies, so traffic numbers exist without
+any tracking code on the site. To read them:
+
+    ./scripts/stats.sh          # last 7 days
+    ./scripts/stats.sh 3        # last 3 days
+
+That reports daily requests, page views and unique visitors for the site, a
+24-hour breakdown by hostname and country, and the API Worker's request and
+error counts. It authenticates with the existing wrangler login; if it fails,
+run `npx wrangler login`.
+
+The same numbers are in the dashboard under **ipgoblin.com -> Analytics &
+Logs -> Traffic** and **Workers & Pages -> ipgoblin-api -> Metrics**.
+
+Free-plan limits: the daily dataset keeps 7 days, and the per-country dataset
+only answers for a 24-hour window.
+
+These are aggregate edge counts, not visitor logs, so the site's "nothing is
+logged here" promise still holds. Note that a fair share of the non-US traffic
+is bots and scanners rather than people.
