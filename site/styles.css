@@ -269,6 +269,138 @@ body {
   color: var(--slime);
 }
 
+/* ---------- speed test ---------- */
+
+.speed-section { margin: 56px auto 0; max-width: 720px; }
+
+.speed-intro,
+.speed-note {
+  margin: 10px auto 0;
+  max-width: 620px;
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.speed-note { margin-top: 14px; font-size: 0.78rem; }
+
+.speed-card { margin-top: 18px; }
+
+.speed-track {
+  position: relative;
+  height: 72px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 38px, rgba(125, 255, 60, 0.12) 38px 40px),
+    #000;
+  overflow: hidden;
+}
+
+.speed-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, rgba(125, 255, 60, 0.05), rgba(125, 255, 60, 0.28));
+  transition: width 120ms linear;
+}
+
+/* Sits on the track and is dragged along it by the JS setting `left`. The
+   translate keeps the goblin centred on its own position rather than starting
+   off the left edge. */
+.speed-runner {
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: auto;
+  height: 76px;
+  transform: translateX(-50%);
+  transition: left 120ms linear;
+  pointer-events: none;
+}
+
+.speed-live {
+  margin-top: 16px;
+  text-align: center;
+  line-height: 1;
+}
+
+.speed-live-value {
+  font-size: clamp(2.2rem, 8vw, 3.4rem);
+  font-weight: 700;
+  color: var(--beige);
+  text-shadow: 0 0 18px rgba(240, 228, 200, 0.35);
+}
+
+.speed-live-unit {
+  margin-left: 6px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.speed-phase {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--slime);
+  min-height: 1.3em;
+}
+
+.speed-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 20px 0 0;
+}
+
+.speed-stat {
+  padding: 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.speed-stat dt {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.speed-stat dd {
+  margin: 6px 0 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.speed-stat dd small {
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.speed-verdict {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--gold);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 198, 60, 0.08);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--beige);
+}
+
+.speed-card.is-down .speed-fill {
+  background: linear-gradient(90deg, rgba(125, 255, 60, 0.05), rgba(125, 255, 60, 0.35));
+}
+
+.speed-card.is-up .speed-fill {
+  background: linear-gradient(90deg, rgba(255, 198, 60, 0.05), rgba(255, 198, 60, 0.35));
+}
+
 /* ---------- footer ---------- */
 
 .footer {
@@ -311,9 +443,11 @@ body {
   .card { order: -1; flex-basis: 100%; }
   .goblin { width: min(190px, 40vw); }
   .command { font-size: 0.85rem; padding: 12px 12px; }
+  .speed-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .banner { animation: none; background-color: #0f1a08; }
   html { scroll-behavior: auto; }
+  .speed-runner, .speed-fill { transition: none; }
 }

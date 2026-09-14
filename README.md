@@ -21,20 +21,22 @@
 | `site/` | The static site published to [ipgoblin.com](https://ipgoblin.com) |
 | `worker/` | Cloudflare Worker behind [api.ipgoblin.com](https://api.ipgoblin.com) |
 | `stats-worker/` | Cloudflare Worker behind `stats.ipgoblin.com`, password protected |
+| `speed-worker/` | Cloudflare Worker behind [speed.ipgoblin.com](https://speed.ipgoblin.com), the speed-test backend |
 | `scripts/` | Publish and reporting helpers |
 | `.github/workflows/pages.yml` | Pages deploy, currently blocked (see [Deploying](#deploying)) |
-| `speedtest/` | An unfinished 2023 speed-test tool with a Node backend. Not deployed, not referenced by anything above. |
+| `speedtest/` | An abandoned 2023 speed-test tool with a Node backend. Superseded by `speed-worker/`; see [The speed test](#the-speed-test). |
 | `index.php`, `index2.php`, `index3.php`, `*.zip`, loose images | The original 2023 PHP site, kept for reference. Not deployed. |
 
-Three pieces, deployed independently:
+Four pieces, deployed independently:
 
 ```
 ipgoblin.com        ->  Cloudflare  ->  GitHub Pages (gh-pages branch)  <- site/
 api.ipgoblin.com    ->  Cloudflare Worker "ipgoblin-api"                <- worker/
 stats.ipgoblin.com  ->  Cloudflare Worker "ipgoblin-stats"              <- stats-worker/
+speed.ipgoblin.com  ->  Cloudflare Worker "ipgoblin-speed"              <- speed-worker/
 ```
 
-Cloudflare is authoritative for DNS and terminates TLS for all three.
+Cloudflare is authoritative for DNS and terminates TLS for all four.
 
 ## The site
 
@@ -46,6 +48,7 @@ Cloudflare is authoritative for DNS and terminates TLS for all three.
 | `site/index.html` | The page: banner, goblins, IP card, dossier |
 | `site/styles.css` | Goblin-green theme, responsive layout |
 | `site/app.js` | Client-side IP + geo lookup, flags, taunts, copy buttons |
+| `site/speedtest.js` | The speed test, see [The speed test](#the-speed-test) |
 | `site/CNAME` | Custom domain (`ipgoblin.com`) |
 | `site/assets/` | Goblin GIFs and favicons |
 
@@ -180,6 +183,110 @@ custom_domain = true
 
 `npx wrangler deploy` creates and maintains the matching DNS record in the Cloudflare zone, so
 there is nothing to add by hand. This only works while Cloudflare is authoritative for the zone.
+
+## The speed test
+
+`speed-worker/` is the `ipgoblin-speed` Worker behind
+[speed.ipgoblin.com](https://speed.ipgoblin.com). `site/speedtest.js` drives it from the page.
+
+It measures the link between the visitor and **their nearest Cloudflare edge**, which is what
+every browser-based speed test measures. It is not a measurement of the wider internet. The
+edge that answered is reported as the colo code (`ATL`, `LHR`, and so on).
+
+### Endpoints
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/ping` | GET | 204 with no body. Latency and jitter come from round trips. |
+| `/down?bytes=N` | GET | `N` bytes of incompressible filler. Capped at 26 MiB per request. |
+| `/up` | POST | Reads and discards the body, returns `{"received":N,"colo":"ATL"}`. Rejects over 26 MiB with 413. |
+| `/` | GET | Plain-text usage. |
+
+Drive it by hand:
+
+```sh
+# download throughput
+curl -o /dev/null -s -w '%{speed_download} B/s\n' \
+  'https://speed.ipgoblin.com/down?bytes=10000000'
+
+# latency
+curl -o /dev/null -s -w '%{time_total}s\n' https://speed.ipgoblin.com/ping
+```
+
+### How it stays inside the free plan
+
+Workers allow 10 ms of CPU per request, so the response body is never generated per request.
+A pool of 16 random 64 KB blocks is built **once per isolate** and streamed repeatedly, which
+makes serving 100 MB cost about the same CPU as serving 100 KB.
+
+The blocks must be distinct. A single block repeated would sit well inside a gzip window and
+compress away to nearly nothing, and the measured speed would be a fiction. A 1 MB cycle of
+random data is wider than any compression window and incompressible anyway, so what crosses
+the wire is what was counted. `crypto.getRandomValues` refuses buffers over 64 KB, which is
+why the block size is exactly that.
+
+The stream is `pull`-based so a slow client applies backpressure instead of forcing the Worker
+to buffer the whole response.
+
+Note that the 100,000 requests/day free allowance is **account-wide**, shared with the other
+three Workers. `ipgoblin-speed` is separate so it can be disabled on its own if its bandwidth
+ever becomes a problem, not because it has its own quota.
+
+### How the client measures
+
+- **Latency** — 10 sequential `/ping` round trips. The first is discarded, since it pays for
+  DNS, TLS and the TCP handshake. The rest are reported as a **median** (resistant to a single
+  outlier) with jitter as the mean absolute difference between consecutive trips.
+- **Download** — 4 parallel streams, read incrementally so throughput is sampled continuously
+  rather than inferred from a single start/end pair.
+- **Upload** — 4 parallel POSTs of random filler. The Worker's response only arrives after it
+  has drained the whole body, so the round trip bounds the time the bytes took to arrive.
+
+Both throughput phases discard a **warm-up window** before measuring, because TCP slow start
+makes the first second far slower than the steady state. The warm-up is capped at a fraction
+of the run, so a fast link that hits its byte budget early still leaves a measurable window
+instead of discarding everything.
+
+Each phase is bounded by **both** a time budget and a byte budget, whichever comes first:
+
+| Phase | Time | Bytes |
+| --- | --- | --- |
+| Download | 8 s | 120 MB |
+| Upload | 6 s | 48 MB |
+
+The byte budgets are the important half. On a gigabit link, 8 seconds of unbounded downloading
+would pull roughly a gigabyte. They also bound what a visitor on a metered connection spends,
+which the page says on the card.
+
+Upload budgets are enforced against bytes *committed* rather than bytes *received*, because
+several parallel streams would otherwise all read a stale counter and each launch one more
+chunk — which overshot the cap by 86% before it was fixed.
+
+A stream that fails part-way is tolerated rather than fatal: whatever arrived is kept and that
+stream bows out. Only a total failure is reported. Opening several fat parallel connections
+occasionally trips an edge rate limit, and that should not discard a usable measurement.
+
+### Working on the speed test
+
+```sh
+cd speed-worker
+npm install
+npm run dev      # http://127.0.0.1:8787
+npm run deploy
+```
+
+`speed-worker/wrangler.toml` declares `speed.ipgoblin.com` as a custom domain, so
+`npx wrangler deploy` creates and maintains the DNS record.
+
+The client's `ENDPOINT` constant at the top of `site/speedtest.js` points at production.
+
+### The old speedtest/ directory
+
+`speedtest/` is a 2023 attempt that was never deployed. It is kept for reference only and
+**was not ported**, because it could not have worked as a website feature: its
+`backend/server.js` ran Ookla's `speedtest-net` *on the server*, so every visitor would have
+been shown the server's own bandwidth rather than their own. It also carries ~1,900 committed
+`node_modules` files. `speed-worker/` is a rebuild, not a port.
 
 ## Checking usage
 

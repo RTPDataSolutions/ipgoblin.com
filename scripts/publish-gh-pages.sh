@@ -31,9 +31,12 @@ sha() {
   else sha256sum "$1" | cut -c1-10; fi
 }
 
-for asset in styles.css app.js; do
-  [ -f "$tmp/$asset" ] || continue
-  hash="$(sha "$tmp/$asset")"
+# Discovered rather than listed, so a new stylesheet or script is cache-busted
+# automatically instead of silently serving stale for four hours.
+for path in "$tmp"/*.css "$tmp"/*.js; do
+  [ -f "$path" ] || continue
+  asset="$(basename "$path")"
+  hash="$(sha "$path")"
   find "$tmp" -name '*.html' -print0 |
     xargs -0 perl -pi -e "s{\Q$asset\E(?=[\"'])}{$asset?v=$hash}g"
   echo "Stamped $asset as $asset?v=$hash"

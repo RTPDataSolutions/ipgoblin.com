@@ -88,6 +88,50 @@
     </p>
   </section>
 
+  <section class="speed-section" id="speedtest">
+    <h2 class="label center">Make the goblins run</h2>
+    <p class="speed-intro">
+      The goblins will haul loot down from the nearest Cloudflare edge, then drag it back up,
+      and time themselves doing it. Then they will have opinions about your connection.
+    </p>
+
+    <div class="card speed-card" id="sp-card">
+      <div class="speed-track">
+        <div class="speed-fill" id="sp-fill"></div>
+        <img class="speed-runner" id="sp-runner" src="assets/crazy-goblin-1.gif"
+             alt="" width="241" height="280" loading="lazy">
+      </div>
+
+      <div class="speed-live">
+        <span class="speed-live-value" id="sp-live">0</span>
+        <span class="speed-live-unit">Mbps</span>
+      </div>
+      <p class="speed-phase" id="sp-phase">The goblins are asleep. Wake them.</p>
+
+      <dl class="speed-grid">
+        <div class="speed-stat"><dt>Download</dt><dd><span id="sp-down">—</span> <small>Mbps</small></dd></div>
+        <div class="speed-stat"><dt>Upload</dt><dd><span id="sp-up">—</span> <small>Mbps</small></dd></div>
+        <div class="speed-stat"><dt>Latency</dt><dd><span id="sp-ping">—</span></dd></div>
+        <div class="speed-stat"><dt>Jitter</dt><dd><span id="sp-jitter">—</span></dd></div>
+      </dl>
+
+      <p class="speed-verdict" id="sp-verdict" hidden></p>
+
+      <div class="card-actions">
+        <button id="sp-start" class="btn" type="button">Wake the goblins</button>
+        <button id="sp-copy" class="btn btn-ghost" type="button" hidden>Copy results</button>
+      </div>
+
+      <p id="sp-error" class="error" hidden></p>
+    </div>
+
+    <p class="speed-note">
+      Measures the link between you and your nearest Cloudflare edge, which is what every
+      browser-based speed test measures. It is capped at roughly 120&nbsp;MB down and 40&nbsp;MB up
+      per run, so mind your data if you are on a metered connection.
+    </p>
+  </section>
+
   <footer class="footer">
     <img class="hoard" src="assets/goblin-hoard.jpg" alt="The goblin hoard" width="400" loading="lazy">
     <p>Geo data by <a href="https://ipwho.is" target="_blank" rel="noopener noreferrer">ipwho.is</a> /
@@ -103,5 +147,6 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="app.js"></script>
+<script src="speedtest.js"></script>
 </body>
 </html>

@@ -1,0 +1,9 @@
+name = "ipgoblin-speed"
+main = "src/index.js"
+compatibility_date = "2026-09-04"
+
+workers_dev = false
+
+[[routes]]
+pattern = "speed.ipgoblin.com"
+custom_domain = true
