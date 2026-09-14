@@ -279,8 +279,8 @@
     );
   }
 
-  function renderBanner(geo, bannerIp) {
-    var ip = bannerIp || geo.ip || UNKNOWN;
+  function renderBanner(geo) {
+    var ip = geo.ip || UNKNOWN;
     el.bannerIp.textContent = ip;
     if (!geo.countryCode) return;
     var src = flagUrl(geo.countryCode, 80);
@@ -520,14 +520,22 @@
 
     bind();
 
-    // Both lookups start together, so preferring IPv4 in the banner costs no extra latency.
+    // Both lookups start together, so preferring IPv4 costs no extra latency.
     Promise.all([loadGeo(), loadAltIPs()]).then(function (results) {
       var geo = results[0];
       var altIPs = results[1];
+
+      // The geo provider reports whichever address it happened to see, which is
+      // IPv6 on a dual-stack connection. Present the IPv4 instead. Everything
+      // downstream keys off geo.ip, so setting it here makes the banner, the
+      // dossier, the taunts and the alt-IP rows agree. The IPv6 is still listed
+      // as an alternate, because renderAltIPs only skips the address shown above.
+      geo.ip = pickIPv4(altIPs) || geo.ip;
+
       state.geo = geo;
       state.altIPs = altIPs;
 
-      renderBanner(geo, pickIPv4(altIPs));
+      renderBanner(geo);
       renderDetails(geo);
       taunt(geo);
       renderAltIPs(altIPs);

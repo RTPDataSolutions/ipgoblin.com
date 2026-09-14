@@ -5,6 +5,7 @@
   --slime: #7dff3c;
   --slime-dim: #4e9c26;
   --gold: #ffc63c;
+  --beige: #f0e4c8;
   --ink: #e7ffd8;
   --muted: #9bbd83;
   --border: rgba(125, 255, 60, 0.28);
@@ -52,8 +53,8 @@ body {
   font-size: clamp(1.1rem, 4vw, 2rem);
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--slime);
-  text-shadow: 0 0 12px rgba(125, 255, 60, 0.5);
+  color: var(--beige);
+  text-shadow: 0 0 12px rgba(240, 228, 200, 0.45);
   word-break: break-all;
 }
 
