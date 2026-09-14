@@ -146,21 +146,51 @@ there is nothing to add by hand. This only works while Cloudflare is authoritati
 ## Checking usage
 
 Cloudflare counts every request it proxies, so traffic numbers exist without
-any tracking code on the site. To read them:
+any tracking code on the site. There are two ways to read them.
+
+### stats.ipgoblin.com
+
+A password-protected dashboard, served by the `ipgoblin-stats` Worker in
+`stats-worker/`. Visit <https://stats.ipgoblin.com> and the browser will ask
+for a username and password: the username is `goblin`, the password is the
+`STATS_PASSWORD` secret. Add `?format=json` for the raw numbers.
+
+It lives in its own Worker rather than as a route on `api.ipgoblin.com` so
+that the Cloudflare API token is not sitting on the public API surface. The
+token is only ever used server-side and never reaches the browser. The page
+sends `no-store` and `noindex`.
+
+Two secrets are needed before it will serve anything; until they are set it
+answers 503. Set them from `stats-worker/`:
+
+    npx wrangler secret put CF_API_TOKEN
+    npx wrangler secret put STATS_PASSWORD
+
+`CF_API_TOKEN` is a Cloudflare API token created at
+<https://dash.cloudflare.com/profile/api-tokens> with exactly two read
+permissions, which are enough to read analytics and nothing else:
+
+  * Account -> Account Analytics -> Read
+  * Zone -> Zone Analytics -> Read
+
+Deploy changes with `npx wrangler deploy` from `stats-worker/`.
+
+### From the command line
 
     ./scripts/stats.sh          # last 7 days
     ./scripts/stats.sh 3        # last 3 days
 
-That reports daily requests, page views and unique visitors for the site, a
-24-hour breakdown by hostname and country, and the API Worker's request and
-error counts. It authenticates with the existing wrangler login; if it fails,
-run `npx wrangler login`.
+Same numbers in the terminal. This one authenticates with the existing
+wrangler login instead of a stored token, so there is nothing to configure; if
+it fails, run `npx wrangler login`.
 
-The same numbers are in the dashboard under **ipgoblin.com -> Analytics &
-Logs -> Traffic** and **Workers & Pages -> ipgoblin-api -> Metrics**.
+### Notes
+
+The dashboard is also in Cloudflare under **ipgoblin.com -> Analytics & Logs
+-> Traffic** and **Workers & Pages -> ipgoblin-api -> Metrics**.
 
 Free-plan limits: the daily dataset keeps 7 days, and the per-country dataset
-only answers for a 24-hour window.
+only answers for a 24-hour window. Both tools are written to those limits.
 
 These are aggregate edge counts, not visitor logs, so the site's "nothing is
 logged here" promise still holds. Note that a fair share of the non-US traffic

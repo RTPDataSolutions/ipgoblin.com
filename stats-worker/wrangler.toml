@@ -1,0 +1,17 @@
+name = "ipgoblin-stats"
+main = "src/index.js"
+compatibility_date = "2026-09-04"
+
+workers_dev = false
+
+[[routes]]
+pattern = "stats.ipgoblin.com"
+custom_domain = true
+
+# Identifiers, not credentials. The API token and the dashboard password are
+# Worker secrets, set with `wrangler secret put`.
+[vars]
+ZONE_NAME = "ipgoblin.com"
+ZONE_ID = "6590bca6465d978cb96f96f48897b0df"
+ACCOUNT_ID = "2650b65f004f1023c6bf8c5cc836c72a"
+WORKER_NAME = "ipgoblin-api"
