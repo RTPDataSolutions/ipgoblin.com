@@ -23,6 +23,22 @@ trap 'rm -rf "$tmp"' EXIT
 
 cp -R "$src"/. "$tmp"/
 
+# Cloudflare caches CSS/JS at the edge for four hours, so a plain redeploy would
+# keep serving the old files. Stamp each reference with a content hash. This only
+# touches the published copy; site/ stays clean for local development.
+sha() {
+  if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | cut -c1-10
+  else sha256sum "$1" | cut -c1-10; fi
+}
+
+for asset in styles.css app.js; do
+  [ -f "$tmp/$asset" ] || continue
+  hash="$(sha "$tmp/$asset")"
+  find "$tmp" -name '*.html' -print0 |
+    xargs -0 perl -pi -e "s{\Q$asset\E(?=[\"'])}{$asset?v=$hash}g"
+  echo "Stamped $asset as $asset?v=$hash"
+done
+
 cd "$tmp"
 git init -q -b "$BRANCH"
 git add -A
