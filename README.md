@@ -80,7 +80,9 @@ Then enable **Enforce HTTPS** in the repository's Pages settings.
 `CF-Connecting-IP` and `request.cf` straight off the edge request, so there are no upstream API
 calls, no keys and no rate limits beyond the Workers free tier (100k requests/day).
 
-Live at **https://ipgoblin-api.melanie-stewart.workers.dev**.
+Deployed, and reachable at **https://api.ipgoblin.com** once the DNS move below is done. The
+Worker also has a default `*.workers.dev` URL, which is deliberately not published here because it
+embeds the account owner's name.
 
 | Endpoint | Returns |
 | --- | --- |
@@ -102,9 +104,9 @@ Live at **https://ipgoblin-api.melanie-stewart.workers.dev**.
 | `/help` | usage |
 
 ```sh
-curl -L ipgoblin-api.melanie-stewart.workers.dev
-curl -L ipgoblin-api.melanie-stewart.workers.dev/json | jq .
-curl -4 -L ipgoblin-api.melanie-stewart.workers.dev   # force IPv4
+curl -L api.ipgoblin.com
+curl -L api.ipgoblin.com/json | jq .
+curl -4 -L api.ipgoblin.com   # force IPv4
 ```
 
 CORS is open, so the site itself can call it from the browser.
@@ -124,8 +126,8 @@ Workers custom domains only work when Cloudflare is authoritative for the zone, 
 currently uses Dynadot DNS. To switch:
 
 1. Add ipgoblin.com to a Cloudflare account and let it import the existing records.
-2. Confirm the four `185.199.*.153` A records and the `www` CNAME came across, set to **DNS only**
-   (grey cloud) so GitHub Pages keeps serving the apex and its certificate.
+2. Confirm the four `185.199.*.153` A records and the `www` CNAME came across.
 3. Change the nameservers at Dynadot to the pair Cloudflare provides.
 4. Uncomment the `[[routes]]` block in `worker/wrangler.toml` and run `npx wrangler deploy`.
-5. Update the `curl` command in `site/index.html` and the URLs above.
+5. Set `workers_dev = false` in `worker/wrangler.toml` and deploy again, so the Worker is only
+   reachable at api.ipgoblin.com and the name-bearing `*.workers.dev` URL is retired.
