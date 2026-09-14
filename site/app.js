@@ -259,6 +259,14 @@
     });
   }
 
+  function pickIPv4(altIPs) {
+    if (!altIPs) return null;
+    for (var i = 0; i < altIPs.length; i++) {
+      if (altIPs[i].label === "IPv4" && altIPs[i].ip) return altIPs[i].ip;
+    }
+    return null;
+  }
+
   function flagUrl(code, width) {
     return "https://flagcdn.com/w" + width + "/" + code.toLowerCase() + ".png";
   }
@@ -271,8 +279,9 @@
     );
   }
 
-  function renderBanner(geo) {
-    el.bannerIp.textContent = geo.ip || UNKNOWN;
+  function renderBanner(geo, bannerIp) {
+    var ip = bannerIp || geo.ip || UNKNOWN;
+    el.bannerIp.textContent = ip;
     if (!geo.countryCode) return;
     var src = flagUrl(geo.countryCode, 80);
     var alt = "Flag of " + (geo.country || geo.countryCode);
@@ -282,7 +291,7 @@
       img.hidden = false;
       img.onerror = function () { img.hidden = true; };
     });
-    document.title = "IP Goblin — " + geo.ip + " " + flagEmoji(geo.countryCode);
+    document.title = "IP Goblin — " + ip + " " + flagEmoji(geo.countryCode);
   }
 
   function renderDetails(geo) {
@@ -511,14 +520,16 @@
 
     bind();
 
-    loadGeo().then(function (geo) {
+    // Both lookups start together, so preferring IPv4 in the banner costs no extra latency.
+    Promise.all([loadGeo(), loadAltIPs()]).then(function (results) {
+      var geo = results[0];
+      var altIPs = results[1];
       state.geo = geo;
-      renderBanner(geo);
+      state.altIPs = altIPs;
+
+      renderBanner(geo, pickIPv4(altIPs));
       renderDetails(geo);
       taunt(geo);
-      return loadAltIPs();
-    }).then(function (altIPs) {
-      state.altIPs = altIPs;
       renderAltIPs(altIPs);
     }).catch(function (err) {
       showError(err && err.message ? err.message : "Unknown failure.");
