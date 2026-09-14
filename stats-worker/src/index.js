@@ -16,11 +16,22 @@
  */
 
 const GRAPHQL = 'https://api.cloudflare.com/client/v4/graphql';
+const DOH = 'https://cloudflare-dns.com/dns-query';
 const USER = 'goblin';
 const REALM = 'IP Goblin stats';
 
 /** Free-plan retention for the daily dataset. */
 const MAX_DAYS = 7;
+
+/** Raw grouped rows pulled per visitor pass, before deduplication. */
+const VISITOR_ROWS = 2000;
+const RECENT_ROWS = 500;
+
+/** Visitors rendered, and how many of those get a reverse-DNS lookup. */
+const VISITOR_LIMIT = 120;
+const PTR_LIMIT = 36;
+const PTR_CONCURRENCY = 12;
+const PTR_TIMEOUT_MS = 2000;
 
 const SECURITY_HEADERS = {
   'cache-control': 'no-store, private',
@@ -126,6 +137,197 @@ const WORKER_QUERY = `query($account:String!,$script:String!,$from:Time!,$to:Tim
   }}
 }`;
 
+// One row per (ip, country, device, agent, path). Collapsed to one row per
+// visitor in buildVisitors below.
+const VISITOR_QUERY = `query($zone:String!,$from:Time!,$to:Time!){
+  viewer{zones(filter:{zoneTag:$zone}){
+    httpRequestsAdaptiveGroups(limit:${VISITOR_ROWS},orderBy:[count_DESC],filter:{datetime_geq:$from,datetime_lt:$to}){
+      count dimensions{clientIP clientCountryName clientDeviceType userAgent clientRequestPath}
+    }
+  }}
+}`;
+
+// Separate pass purely for recency: the identity query is ordered by volume,
+// so it cannot also tell us who showed up most recently.
+const RECENT_QUERY = `query($zone:String!,$from:Time!,$to:Time!){
+  viewer{zones(filter:{zoneTag:$zone}){
+    httpRequestsAdaptiveGroups(limit:${RECENT_ROWS},orderBy:[datetimeMinute_DESC],filter:{datetime_geq:$from,datetime_lt:$to}){
+      dimensions{clientIP datetimeMinute}
+    }
+  }}
+}`;
+
+/* ---------- visitors ---------- */
+
+/** 1.2.3.4 -> 4.3.2.1.in-addr.arpa, or the nibble form for IPv6. */
+function reverseName(ip) {
+  if (ip.includes('.')) {
+    const parts = ip.split('.');
+    if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p))) return null;
+    return parts.reverse().join('.') + '.in-addr.arpa';
+  }
+  const full = expandIPv6(ip);
+  if (!full) return null;
+  return full.split('').reverse().join('.') + '.ip6.arpa';
+}
+
+/** Expands an IPv6 address to its 32 bare hex digits. */
+function expandIPv6(ip) {
+  if (!/^[0-9a-fA-F:]+$/.test(ip)) return null;
+  const halves = ip.split('::');
+  if (halves.length > 2) return null;
+
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  if (fill < 0) return null;
+
+  const groups = [...head, ...Array(fill).fill('0'), ...tail];
+  if (groups.length !== 8) return null;
+
+  return groups.map((g) => g.padStart(4, '0')).join('').toLowerCase();
+}
+
+async function lookupPTR(ip) {
+  const name = reverseName(ip);
+  if (!name) return null;
+
+  // Never let a slow resolver hold up the whole dashboard.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), PTR_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${DOH}?name=${encodeURIComponent(name)}&type=PTR`, {
+      headers: { accept: 'application/dns-json' },
+      signal: abort.signal,
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    const answer = (body.Answer || []).find((a) => a.type === 12);
+    return answer ? answer.data.replace(/\.$/, '') : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Resolves in small batches so we stay well inside the subrequest budget. */
+async function resolveHostnames(visitors) {
+  const targets = visitors.slice(0, PTR_LIMIT);
+  for (let i = 0; i < targets.length; i += PTR_CONCURRENCY) {
+    const batch = targets.slice(i, i + PTR_CONCURRENCY);
+    const names = await Promise.all(batch.map((v) => lookupPTR(v.ip)));
+    batch.forEach((v, n) => { v.hostname = names[n]; });
+  }
+}
+
+/** Boils a user agent down to something readable in a narrow column. */
+function uaLabel(ua) {
+  if (!ua) return 'unknown';
+
+  const bot = ua.match(/(Googlebot|bingbot|YandexBot|DuckDuckBot|Baiduspider|AhrefsBot|SemrushBot|MJ12bot|DotBot|PetalBot|Applebot|facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|CensysInspect|InternetMeasurement|Expanse|NetSystemsResearch|CorePropagation|l9scan|LeakIX|Odin|masscan|zgrab|Nuclei|Nmap|sqlmap|python-requests|aiohttp|httpx|curl|wget|Go-http-client|Java|libwww-perl|axios|okhttp|Scrapy|HeadlessChrome)/i);
+  if (bot) return bot[1];
+  if (/bot|crawler|spider|scanner|scan\b/i.test(ua)) return 'other bot';
+
+  const browser =
+    /Edg\//.test(ua) ? 'Edge' :
+    /OPR\/|Opera/.test(ua) ? 'Opera' :
+    /Firefox\//.test(ua) ? 'Firefox' :
+    /Chrome\//.test(ua) ? 'Chrome' :
+    /Safari\//.test(ua) ? 'Safari' : null;
+
+  const os =
+    /Windows/.test(ua) ? 'Windows' :
+    /iPhone|iPad|iOS/.test(ua) ? 'iOS' :
+    /Android/.test(ua) ? 'Android' :
+    /Mac OS X|Macintosh/.test(ua) ? 'macOS' :
+    /Linux/.test(ua) ? 'Linux' : null;
+
+  if (browser && os) return `${browser} on ${os}`;
+  if (browser || os) return browser || os;
+
+  // Unrecognised: surface the first product token that actually identifies
+  // something, rather than the boilerplate every agent copies.
+  const token = ua
+    .match(/[A-Za-z][A-Za-z0-9._-]*\/[0-9][\w.]*/g)
+    ?.find((t) => !/^(Mozilla|AppleWebKit|KHTML|Gecko|Version|Safari|Chrome|Mobile)\//i.test(t));
+
+  return token || ua.slice(0, 28);
+}
+
+/** Picks the most frequently seen value from a count map. */
+function topKey(map) {
+  let best = null;
+  let bestCount = -1;
+  for (const [key, count] of map) {
+    if (count > bestCount) { best = key; bestCount = count; }
+  }
+  return best;
+}
+
+/**
+ * Collapses the grouped rows into one entry per client IP, so a visitor who
+ * hit twelve URLs is a single line with a hit count rather than twelve lines.
+ */
+function buildVisitors(rows, recent) {
+  if (rows.error) return { error: rows.error };
+
+  const byIP = new Map();
+  for (const row of rows) {
+    const { clientIP: ip, clientCountryName, clientDeviceType, userAgent, clientRequestPath } =
+      row.dimensions;
+    if (!ip) continue;
+
+    let v = byIP.get(ip);
+    if (!v) {
+      v = {
+        ip,
+        hits: 0,
+        paths: new Set(),
+        countries: new Map(),
+        devices: new Map(),
+        agents: new Map(),
+        hostname: null,
+        lastSeen: null,
+      };
+      byIP.set(ip, v);
+    }
+
+    v.hits += row.count;
+    if (clientRequestPath) v.paths.add(clientRequestPath);
+    bump(v.countries, clientCountryName, row.count);
+    bump(v.devices, clientDeviceType, row.count);
+    bump(v.agents, userAgent, row.count);
+  }
+
+  if (!recent.error) {
+    for (const row of recent) {
+      const v = byIP.get(row.dimensions.clientIP);
+      // Rows arrive newest first, so the first one we see per IP wins.
+      if (v && !v.lastSeen) v.lastSeen = row.dimensions.datetimeMinute;
+    }
+  }
+
+  return [...byIP.values()]
+    .map((v) => ({
+      ip: v.ip,
+      hits: v.hits,
+      paths: v.paths.size,
+      country: topKey(v.countries),
+      device: topKey(v.devices),
+      agent: uaLabel(topKey(v.agents)),
+      hostname: null,
+      lastSeen: v.lastSeen,
+    }))
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, VISITOR_LIMIT);
+}
+
+function bump(map, key, by) {
+  if (key === null || key === undefined || key === '') return;
+  map.set(key, (map.get(key) || 0) + by);
+}
+
 async function collect(env) {
   const zone = env.ZONE_ID;
   const account = env.ACCOUNT_ID;
@@ -136,7 +338,7 @@ async function collect(env) {
 
   // One round trip each, in parallel. A single failure should not blank the
   // whole page, so each section degrades on its own.
-  const [daily, breakdown, worker] = await Promise.all([
+  const [daily, breakdown, worker, visitorRows, recentRows] = await Promise.all([
     graphql(token, DAILY_QUERY, { zone, from: isoDate(MAX_DAYS - 1), to: isoDate(0) })
       .then((d) => d.viewer.zones[0].httpRequests1dGroups)
       .catch((e) => ({ error: e.message })),
@@ -146,9 +348,18 @@ async function collect(env) {
     graphql(token, WORKER_QUERY, { account, script: env.WORKER_NAME, from, to })
       .then((d) => d.viewer.accounts[0].workersInvocationsAdaptive)
       .catch((e) => ({ error: e.message })),
+    graphql(token, VISITOR_QUERY, { zone, from, to })
+      .then((d) => d.viewer.zones[0].httpRequestsAdaptiveGroups)
+      .catch((e) => ({ error: e.message })),
+    graphql(token, RECENT_QUERY, { zone, from, to })
+      .then((d) => d.viewer.zones[0].httpRequestsAdaptiveGroups)
+      .catch((e) => ({ error: e.message })),
   ]);
 
-  return { daily, breakdown, worker, generated: new Date().toISOString() };
+  const visitors = buildVisitors(visitorRows, recentRows);
+  if (!visitors.error) await resolveHostnames(visitors);
+
+  return { daily, breakdown, worker, visitors, generated: new Date().toISOString() };
 }
 
 /* ---------- rendering ---------- */
@@ -274,6 +485,41 @@ function renderWorker(rows) {
   </table>`;
 }
 
+function renderVisitors(rows) {
+  if (rows.error) return errorBox(rows.error);
+  if (!rows.length) return '<p class="muted">No visitors in the last 24 hours.</p>';
+
+  const repeat = rows.filter((r) => r.hits > 1).length;
+  const named = rows.filter((r) => r.hostname).length;
+
+  const body = rows
+    .map((r) => {
+      const who = r.hostname
+        ? `<span class="host">${esc(r.hostname)}</span>`
+        : '<span class="muted">no reverse DNS</span>';
+      return `<tr>
+        <td>${who}<br><span class="ip">${esc(r.ip)}</span></td>
+        <td>${flagEmoji(r.country)} ${esc(r.country || '??')}</td>
+        <td>${esc(r.agent)}</td>
+        <td>${esc(r.device || '?')}</td>
+        <td class="n">${num(r.hits)}</td>
+        <td class="n">${num(r.paths)}</td>
+        <td class="ts">${esc(r.lastSeen ? r.lastSeen.slice(11, 16) + ' UTC' : '—')}</td>
+      </tr>`;
+    })
+    .join('');
+
+  return `<p class="muted">${num(rows.length)} unique visitors &middot; ${num(repeat)} came back for more
+    &middot; ${num(named)} gave up a hostname</p>
+  <div class="scroll"><table>
+    <thead><tr>
+      <th>Host / IP</th><th>From</th><th>Agent</th><th>Device</th>
+      <th class="n">Hits</th><th class="n">Paths</th><th>Last</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`;
+}
+
 function page(stats, zoneName) {
   return `<!doctype html>
 <html lang="en">
@@ -302,6 +548,11 @@ tfoot td{color:var(--beige);font-weight:700;border-top:1px solid var(--border);b
 @media(max-width:620px){.cols{grid-template-columns:1fr}}
 .muted{color:var(--muted);font-size:.85rem;margin:0}
 .err{color:#ff8b6b;font-size:.85rem;margin:0}
+.scroll{overflow-x:auto;margin-top:12px;max-height:520px;overflow-y:auto}
+.scroll thead th{position:sticky;top:0;background:#101c0a;z-index:1}
+.host{color:var(--gold);word-break:break-all}
+.ip{color:var(--beige);font-size:.78rem;word-break:break-all}
+.ts{color:var(--muted);white-space:nowrap}
 footer{color:var(--muted);font-size:.75rem;text-align:center;margin-top:28px;line-height:1.7}
 a{color:var(--slime)}
 </style>
@@ -312,10 +563,13 @@ a{color:var(--slime)}
   <p class="sub">${esc(zoneName)} &middot; generated ${esc(stats.generated)}</p>
   ${section(`Traffic, last ${MAX_DAYS} days`, renderDaily(stats.daily))}
   ${section('Last 24 hours', renderBreakdown(stats.breakdown))}
+  ${section('Visitor stream, last 24 hours', renderVisitors(stats.visitors))}
   ${section('API worker, last 24 hours', renderWorker(stats.worker))}
   <footer>
     Aggregate counts from Cloudflare's edge. No tracking code runs on the site
     and no visitor data is stored.<br>
+    Hostnames come from live reverse-DNS lookups on the top ${PTR_LIMIT} visitors;
+    most residential addresses have none.<br>
     A good share of non-US traffic is bots and scanners rather than people.
   </footer>
 </div>
