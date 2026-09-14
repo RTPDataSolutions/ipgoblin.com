@@ -57,22 +57,29 @@ gh api -X PUT repos/RTPDataSolutions/ipgoblin.com/pages -f build_type=workflow
 
 ### DNS for ipgoblin.com
 
-Point the apex at GitHub Pages. The records below are live at Dynadot (the AAAA records are
-optional and are not currently set):
+The domain is registered at Dynadot but **Cloudflare is authoritative**. Dynadot delegates to
+`melinda.ns.cloudflare.com` and `roman.ns.cloudflare.com`; everything else is managed in the
+Cloudflare dashboard.
+
+The zone holds these records, all **proxied** (orange cloud):
 
 ```
 A     @   185.199.108.153
 A     @   185.199.109.153
 A     @   185.199.110.153
 A     @   185.199.111.153
-AAAA  @   2606:50c0:8000::153
-AAAA  @   2606:50c0:8001::153
-AAAA  @   2606:50c0:8002::153
-AAAA  @   2606:50c0:8003::153
 CNAME www rtpdatasolutions.github.io.
+CNAME api <worker custom domain, created by wrangler>
 ```
 
-Then enable **Enforce HTTPS** in the repository's Pages settings.
+Cloudflare terminates TLS with its own Let's Encrypt certificate for `ipgoblin.com` and reaches
+GitHub Pages over HTTPS. The SSL/TLS encryption mode must stay on **Full** — GitHub Pages answers
+SNI for this host under a `*.github.io` certificate, so `Full (strict)` would fail.
+
+GitHub never managed to issue its own certificate for the custom domain, so **Enforce HTTPS stays
+off in the repository's Pages settings**. Turning it on would break Cloudflare's connection to the
+origin. Leave the custom domain itself set, because Pages needs it to serve the right site for the
+`ipgoblin.com` Host header.
 
 ## The API
 
@@ -80,9 +87,8 @@ Then enable **Enforce HTTPS** in the repository's Pages settings.
 `CF-Connecting-IP` and `request.cf` straight off the edge request, so there are no upstream API
 calls, no keys and no rate limits beyond the Workers free tier (100k requests/day).
 
-Deployed, and reachable at **https://api.ipgoblin.com** once the DNS move below is done. The
-Worker also has a default `*.workers.dev` URL, which is deliberately not published here because it
-embeds the account owner's name.
+Live at **https://api.ipgoblin.com**, served by a Workers custom domain on the Cloudflare zone.
+The default `*.workers.dev` route is disabled, so api.ipgoblin.com is the only way in.
 
 | Endpoint | Returns |
 | --- | --- |
@@ -120,14 +126,15 @@ npx wrangler deploy   # publish
 npx wrangler tail     # live logs
 ```
 
-### Moving the API to api.ipgoblin.com
+### The api.ipgoblin.com custom domain
 
-Workers custom domains only work when Cloudflare is authoritative for the zone, and ipgoblin.com
-currently uses Dynadot DNS. To switch:
+`worker/wrangler.toml` declares the hostname:
 
-1. Add ipgoblin.com to a Cloudflare account and let it import the existing records.
-2. Confirm the four `185.199.*.153` A records and the `www` CNAME came across.
-3. Change the nameservers at Dynadot to the pair Cloudflare provides.
-4. Uncomment the `[[routes]]` block in `worker/wrangler.toml` and run `npx wrangler deploy`.
-5. Set `workers_dev = false` in `worker/wrangler.toml` and deploy again, so the Worker is only
-   reachable at api.ipgoblin.com and the name-bearing `*.workers.dev` URL is retired.
+```toml
+[[routes]]
+pattern = "api.ipgoblin.com"
+custom_domain = true
+```
+
+`npx wrangler deploy` creates and maintains the matching DNS record in the Cloudflare zone, so
+there is nothing to add by hand. This only works while Cloudflare is authoritative for the zone.
