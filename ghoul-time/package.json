@@ -1,0 +1,14 @@
+{
+  "name": "ghoul-time",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GHOUL TIME - Slime Chef: a BurgerTime-style arcade game, served from Cloudflare Workers",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
