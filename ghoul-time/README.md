@@ -6,6 +6,8 @@ kitchen. Pure vanilla JS on a single `<canvas>` — no dependencies, no build st
 Deployed as a **Cloudflare Workers static-asset site**, so it is served from Cloudflare's global
 edge network and costs nothing per request (static assets are not billed as Worker invocations).
 
+![GHOUL TIME — Slime Chef gameplay: the chef on a haunted kitchen lattice of ladders and recipe slabs, with the score/lives HUD on top and four cauldrons along the bottom](docs/screenshot.png)
+
 ## How to play
 
 | Input | Action |
@@ -64,9 +66,11 @@ account):
 ## Project layout
 
 ```
-ghoul-time-site/
+ghoul-time/
 ├── public/
 │   └── index.html    # the entire game (canonical source)
+├── docs/
+│   └── screenshot.png
 ├── wrangler.jsonc    # Workers static-assets config
 └── package.json
 ```
