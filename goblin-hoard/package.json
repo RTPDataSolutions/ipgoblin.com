@@ -1,0 +1,14 @@
+{
+  "name": "goblin-hoard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GOBLIN HOARD - a 16-bit side-scrolling action platformer, served from Cloudflare Workers static assets",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.127.1"
+  }
+}
