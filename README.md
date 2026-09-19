@@ -22,21 +22,27 @@
 | `worker/` | Cloudflare Worker behind [api.ipgoblin.com](https://api.ipgoblin.com) |
 | `stats-worker/` | Cloudflare Worker behind `stats.ipgoblin.com`, password protected |
 | `speed-worker/` | Cloudflare Worker behind [speed.ipgoblin.com](https://speed.ipgoblin.com), the speed-test backend |
+| `goblin-hoard/` | Cloudflare Worker behind [hoard.ipgoblin.com](https://hoard.ipgoblin.com), a 16-bit platformer. See [The arcade](#the-arcade). |
+| `ghoul-time/` | Cloudflare Worker behind [ghoultime.ipgoblin.com](https://ghoultime.ipgoblin.com), a BurgerTime-style arcade game |
 | `scripts/` | Publish and reporting helpers |
 | `.github/workflows/pages.yml` | Pages deploy, currently blocked (see [Deploying](#deploying)) |
 | `speedtest/` | An abandoned 2023 speed-test tool with a Node backend. Superseded by `speed-worker/`; see [The speed test](#the-speed-test). |
 | `index.php`, `index2.php`, `index3.php`, `*.zip`, loose images | The original 2023 PHP site, kept for reference. Not deployed. |
 
-Four pieces, deployed independently:
+Six pieces, deployed independently:
 
 ```
-ipgoblin.com        ->  Cloudflare  ->  GitHub Pages (gh-pages branch)  <- site/
-api.ipgoblin.com    ->  Cloudflare Worker "ipgoblin-api"                <- worker/
-stats.ipgoblin.com  ->  Cloudflare Worker "ipgoblin-stats"              <- stats-worker/
-speed.ipgoblin.com  ->  Cloudflare Worker "ipgoblin-speed"              <- speed-worker/
+ipgoblin.com          ->  Cloudflare  ->  GitHub Pages (gh-pages branch)  <- site/
+api.ipgoblin.com      ->  Cloudflare Worker "ipgoblin-api"                <- worker/
+stats.ipgoblin.com    ->  Cloudflare Worker "ipgoblin-stats"              <- stats-worker/
+speed.ipgoblin.com    ->  Cloudflare Worker "ipgoblin-speed"              <- speed-worker/
+hoard.ipgoblin.com    ->  Cloudflare Worker "goblin-hoard"                <- goblin-hoard/
+ghoultime.ipgoblin.com -> Cloudflare Worker "ghoul-time"                  <- ghoul-time/
 ```
 
-Cloudflare is authoritative for DNS and terminates TLS for all four.
+Cloudflare is authoritative for DNS and terminates TLS for all six. The two games are Workers
+**static-asset** sites rather than script Workers, so their requests are served straight off the
+edge and are not billed as Worker invocations.
 
 ## The site
 
@@ -45,12 +51,15 @@ Cloudflare is authoritative for DNS and terminates TLS for all four.
 
 | File | Purpose |
 | --- | --- |
-| `site/index.html` | The page: banner, goblins, IP card, dossier |
+| `site/index.html` | The page: banner, goblins, IP card, dossier, speed test, arcade links |
 | `site/styles.css` | Goblin-green theme, responsive layout |
 | `site/app.js` | Client-side IP + geo lookup, flags, taunts, copy buttons |
 | `site/speedtest.js` | The speed test, see [The speed test](#the-speed-test) |
 | `site/CNAME` | Custom domain (`ipgoblin.com`) |
 | `site/assets/` | Goblin GIFs and favicons |
+
+The *goblin arcade* section near the bottom of the page links out to the two games; see
+[The arcade](#the-arcade).
 
 It is fully static — no PHP — so the visitor's IP is resolved in the browser with
 [ipwho.is](https://ipwho.is), falling back to [ipapi.co](https://ipapi.co) and then
@@ -287,6 +296,47 @@ The client's `ENDPOINT` constant at the top of `site/speedtest.js` points at pro
 `backend/server.js` ran Ookla's `speedtest-net` *on the server*, so every visitor would have
 been shown the server's own bandwidth rather than their own. It also carries ~1,900 committed
 `node_modules` files. `speed-worker/` is a rebuild, not a port.
+
+## The arcade
+
+Two games, each its own Cloudflare Worker serving **static assets**. Static assets are not billed
+as Worker invocations, so neither one eats into the 100,000 requests/day allowance the other three
+Workers share. The site links to both from the *goblin arcade* section.
+
+### goblin-hoard/
+
+[hoard.ipgoblin.com](https://hoard.ipgoblin.com) — **GOBLIN HOARD**, a 16-bit side-scrolling
+action platformer: run, flutter-jump, whip, and loot four levels ending in a boss.
+
+Vanilla JS, no dependencies and no build step. Notably it ships **no binary assets** — every
+sprite, tile, parallax backdrop, font glyph and note of music is generated in code at load, which
+is why the whole game is roughly 100 KB of source and nothing else.
+
+Levels are assembled from hand-authored 24x18 character grids, and the geometry is written against
+the movement: a running jump clears 4.4 tiles across and 2.3 up. Edit a level without knowing that
+and you will quietly make it impossible. `goblin-hoard/README.md` has the full detail.
+
+```sh
+cd goblin-hoard
+npm install
+npm run dev      # http://127.0.0.1:8788
+npm run deploy
+```
+
+### ghoul-time/
+
+[ghoultime.ipgoblin.com](https://ghoultime.ipgoblin.com) — **GHOUL TIME — Slime Chef**, a
+BurgerTime-style single-screen arcade game, entirely contained in one HTML file. See
+`ghoul-time/README.md`.
+
+```sh
+cd ghoul-time
+npm run dev      # http://127.0.0.1:8787
+npm run deploy
+```
+
+Both declare their hostname as a `custom_domain` route, so `wrangler deploy` creates and maintains
+the DNS record in the Cloudflare zone, exactly as the other Workers do.
 
 ## Checking usage
 

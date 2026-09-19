@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>GOBLIN HOARD &mdash; a 16-bit goblin platformer</title>
+<meta name="description" content="GOBLIN HOARD: a 16-bit side-scrolling action platformer. Whip, leap and loot your way through the packet mines as a very greedy goblin.">
+<meta name="theme-color" content="#0d1408">
+<meta property="og:title" content="GOBLIN HOARD">
+<meta property="og:description" content="A 16-bit side-scrolling goblin platformer. Whip. Leap. Loot.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hoard.ipgoblin.com/">
+<link rel="canonical" href="https://hoard.ipgoblin.com/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230d1408'/%3E%3Cpath d='M3 5h10v6H3z' fill='%238ede4f'/%3E%3Cpath d='M5 7h2v2H5zm4 0h2v2H9z' fill='%23d8382f'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="shell" class="shell">
+  <div class="stage">
+    <canvas id="screen" width="384" height="216" aria-label="GOBLIN HOARD game screen"></canvas>
+
+    <div id="touch" class="touch" hidden aria-hidden="true">
+      <div class="pad pad-left">
+        <button class="tbtn" data-key="left"  type="button" aria-label="Move left">&#9664;</button>
+        <button class="tbtn" data-key="right" type="button" aria-label="Move right">&#9654;</button>
+      </div>
+      <div class="pad pad-right">
+        <button class="tbtn tbtn-atk"  data-key="attack" type="button" aria-label="Whip">&#10022;</button>
+        <button class="tbtn tbtn-jump" data-key="jump"   type="button" aria-label="Jump">&#9650;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="chrome">
+    <a class="chrome-link" href="https://ipgoblin.com/">&#8592; ipgoblin.com</a>
+    <span class="chrome-spacer"></span>
+    <button id="btn-sound" class="chrome-btn" type="button" aria-pressed="true">&#9835; sound on</button>
+    <button id="btn-full" class="chrome-btn" type="button">&#9974; fullscreen</button>
+  </div>
+</div>
+
+<noscript>
+  <p class="noscript">GOBLIN HOARD needs JavaScript. The goblin refuses to move without it.</p>
+</noscript>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

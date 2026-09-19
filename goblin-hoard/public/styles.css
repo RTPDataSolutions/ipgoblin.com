@@ -1,0 +1,161 @@
+/* GOBLIN HOARD - page chrome. Everything inside the canvas is drawn by the game. */
+
+:root {
+  --ink: #0d1408;
+  --goblin: #8ede4f;
+  --goblin-dim: #5a8f34;
+  --panel: #16210f;
+}
+
+* { box-sizing: border-box; }
+
+/* A `display` rule would otherwise beat the `hidden` attribute. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ink);
+  background-image:
+    radial-gradient(ellipse at 50% 0%, #1d2d12 0%, #0d1408 60%),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .25) 0 2px, transparent 2px 4px);
+  color: var(--goblin);
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.stage {
+  position: relative;
+  line-height: 0;
+}
+
+canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: #000;
+  border: 2px solid var(--goblin-dim);
+  border-radius: 3px;
+  box-shadow: 0 0 0 4px #0a1006, 0 12px 40px rgba(0, 0, 0, .7), 0 0 60px rgba(142, 222, 79, .08);
+  touch-action: none;
+  /* Sized by the game to an integer scale factor. */
+}
+
+/* ---- chrome bar ---- */
+
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+
+.chrome-spacer { flex: 1; }
+
+.chrome-link,
+.chrome-btn {
+  color: var(--goblin-dim);
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color .12s, background-color .12s;
+}
+
+.chrome-link:hover,
+.chrome-btn:hover,
+.chrome-btn:focus-visible,
+.chrome-link:focus-visible {
+  color: var(--goblin);
+  background: var(--panel);
+  outline: none;
+}
+
+.chrome-btn[aria-pressed="false"] { opacity: .5; }
+
+/* ---- touch controls ---- */
+
+/* Confined to .stage so the pads never sit on top of the chrome bar. */
+.touch {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 10px 12px;
+  pointer-events: none;
+}
+
+.pad {
+  display: flex;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.pad-right { flex-direction: row-reverse; }
+
+.tbtn {
+  pointer-events: auto;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2px solid rgba(142, 222, 79, .5);
+  background: rgba(13, 20, 8, .5);
+  color: rgba(142, 222, 79, .85);
+  font-size: 22px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+  backdrop-filter: blur(2px);
+}
+
+.tbtn:active,
+.tbtn.is-down {
+  background: rgba(142, 222, 79, .28);
+  transform: scale(.94);
+}
+
+.tbtn-jump { border-color: rgba(255, 210, 63, .6); color: #ffd23f; }
+.tbtn-atk  { border-color: rgba(216, 56, 47, .6);  color: #ef6a5e; }
+
+.noscript {
+  padding: 24px;
+  text-align: center;
+  max-width: 40ch;
+}
+
+@media (max-width: 720px) {
+  .shell { padding: 6px; gap: 6px; }
+  .chrome { font-size: 11px; gap: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tbtn:active, .tbtn.is-down { transform: none; }
+}
