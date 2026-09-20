@@ -86,6 +86,21 @@ body {
 
 .tagline { margin: 8px 0 0; color: var(--muted); }
 
+.established {
+  display: inline-block;
+  margin: 14px 0 0;
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.established strong { color: var(--gold); font-weight: 700; }
+
 .stage {
   display: flex;
   align-items: center;
@@ -411,6 +426,17 @@ body {
   line-height: 1.7;
 }
 .footer a { color: var(--slime); }
+
+.footer-history {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  max-width: 460px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.footer-history strong { color: var(--gold); }
 .hoard {
   width: min(400px, 90vw);
   height: auto;
@@ -512,6 +538,12 @@ body {
   .goblin { width: min(190px, 40vw); }
   .command { font-size: 0.85rem; padding: 12px 12px; }
   .speed-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* The badge is a pill, so it should stay on one line; the wide letter-spacing
+   is what pushes it to two on the narrowest phones. */
+@media (max-width: 380px) {
+  .established { letter-spacing: 0.06em; padding: 5px 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
