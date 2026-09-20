@@ -1,0 +1,553 @@
+:root {
+  --bg: #0d1408;
+  --bg-2: #16240d;
+  --panel: rgba(16, 28, 10, 0.92);
+  --slime: #7dff3c;
+  --slime-dim: #4e9c26;
+  --gold: #ffc63c;
+  --beige: #f0e4c8;
+  --ink: #e7ffd8;
+  --muted: #9bbd83;
+  --border: rgba(125, 255, 60, 0.28);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  padding: 96px 16px 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: ui-monospace, "SFMono-Regular", "Courier New", monospace;
+  background:
+    radial-gradient(circle at 20% 0%, #26401356 0%, transparent 55%),
+    radial-gradient(circle at 85% 20%, #3d5c1a4d 0%, transparent 50%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  background-attachment: fixed;
+}
+
+/* ---------- banner ---------- */
+
+@keyframes goblin-pulse {
+  0%, 100% { background-color: #0f1a08; box-shadow: 0 2px 24px rgba(125, 255, 60, 0.25); }
+  50%      { background-color: #1d3410; box-shadow: 0 2px 34px rgba(255, 198, 60, 0.45); }
+}
+
+.banner {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  animation: goblin-pulse 2.4s ease-in-out infinite;
+  backdrop-filter: blur(4px);
+}
+
+.banner-ip {
+  font-size: clamp(1.1rem, 4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--beige);
+  text-shadow: 0 0 12px rgba(240, 228, 200, 0.45);
+  word-break: break-all;
+}
+
+.banner-flag {
+  width: 46px;
+  height: auto;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- layout ---------- */
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+.hero { text-align: center; padding: 12px 0 22px; }
+
+.logo {
+  margin: 0;
+  font-size: clamp(2.2rem, 7vw, 3.6rem);
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  text-shadow: 0 0 18px rgba(255, 198, 60, 0.35);
+}
+.logo span { color: var(--slime); }
+
+.tagline { margin: 8px 0 0; color: var(--muted); }
+
+.established {
+  display: inline-block;
+  margin: 14px 0 0;
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.established strong { color: var(--gold); font-weight: 700; }
+
+.stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.goblin {
+  width: min(240px, 22vw);
+  height: auto;
+  border-radius: 12px;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.6));
+}
+.goblin-left  { transform: rotate(-2deg); }
+.goblin-right { transform: rotate(2deg); }
+
+/* ---------- card ---------- */
+
+.card {
+  flex: 1 1 520px;
+  max-width: 620px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.taunt {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--gold);
+  border-radius: 6px;
+  background: rgba(255, 198, 60, 0.08);
+  color: var(--gold);
+  font-style: italic;
+  min-height: 2.8em;
+}
+
+.label {
+  margin: 18px 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.label.center { text-align: center; }
+
+.copy-row { display: flex; gap: 8px; align-items: stretch; }
+.copy-row-sub { margin-top: 8px; }
+
+.ip-tag {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid rgba(125, 255, 60, 0.16);
+  border-radius: 10px;
+  background: rgba(6, 12, 3, 0.75);
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+}
+
+.ip-address {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #060c03;
+  color: var(--slime);
+  font: inherit;
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  letter-spacing: 0.03em;
+}
+.ip-address-sub { font-size: 0.95rem; color: var(--muted); }
+
+.copy-btn,
+.btn {
+  padding: 12px 16px;
+  border: 1px solid var(--slime-dim);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2c4d16, #1b3110);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.copy-btn:hover,
+.btn:hover { background: linear-gradient(180deg, #3d6b1f, #244115); border-color: var(--slime); }
+.copy-btn:active,
+.btn:active { transform: translateY(1px); }
+.copy-btn:focus-visible,
+.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.btn-ghost { background: transparent; color: var(--muted); }
+.btn-ghost:hover { background: rgba(125, 255, 60, 0.1); color: var(--ink); }
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.detail {
+  padding: 10px 12px;
+  border: 1px solid rgba(125, 255, 60, 0.16);
+  border-radius: 10px;
+  background: rgba(6, 12, 3, 0.75);
+  min-width: 0;
+}
+.detail dt {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.detail dd {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.detail dd img.flag {
+  width: 22px;
+  height: auto;
+  margin-right: 6px;
+  vertical-align: -3px;
+  border-radius: 2px;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.card-actions .btn { text-decoration: none; display: inline-block; }
+
+.error {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #ff6b6b66;
+  border-radius: 8px;
+  background: rgba(255, 107, 107, 0.1);
+  color: #ffb4b4;
+  font-size: 0.85rem;
+}
+
+/* ---------- terminal ---------- */
+
+.terminal-section { margin: 40px auto 0; max-width: 720px; }
+.terminal-row { justify-content: center; }
+
+.command {
+  flex: 1 1 auto;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #000;
+  color: var(--slime);
+  font-size: 1rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.terminal-hint {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.terminal-hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--slime);
+}
+
+/* ---------- speed test ---------- */
+
+.speed-section { margin: 56px auto 0; max-width: 720px; }
+
+.speed-intro,
+.speed-note {
+  margin: 10px auto 0;
+  max-width: 620px;
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.speed-note { margin-top: 14px; font-size: 0.78rem; }
+
+.speed-card { margin-top: 18px; }
+
+.speed-track {
+  position: relative;
+  height: 72px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 38px, rgba(125, 255, 60, 0.12) 38px 40px),
+    #000;
+  overflow: hidden;
+}
+
+.speed-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, rgba(125, 255, 60, 0.05), rgba(125, 255, 60, 0.28));
+  transition: width 120ms linear;
+}
+
+/* Sits on the track and is dragged along it by the JS setting `left`. The
+   translate keeps the goblin centred on its own position rather than starting
+   off the left edge. */
+.speed-runner {
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: auto;
+  height: 76px;
+  transform: translateX(-50%);
+  transition: left 120ms linear;
+  pointer-events: none;
+}
+
+.speed-live {
+  margin-top: 16px;
+  text-align: center;
+  line-height: 1;
+}
+
+.speed-live-value {
+  font-size: clamp(2.2rem, 8vw, 3.4rem);
+  font-weight: 700;
+  color: var(--beige);
+  text-shadow: 0 0 18px rgba(240, 228, 200, 0.35);
+}
+
+.speed-live-unit {
+  margin-left: 6px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.speed-phase {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--slime);
+  min-height: 1.3em;
+}
+
+.speed-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 20px 0 0;
+}
+
+.speed-stat {
+  padding: 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.speed-stat dt {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.speed-stat dd {
+  margin: 6px 0 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.speed-stat dd small {
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.speed-verdict {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--gold);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 198, 60, 0.08);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--beige);
+}
+
+.speed-card.is-down .speed-fill {
+  background: linear-gradient(90deg, rgba(125, 255, 60, 0.05), rgba(125, 255, 60, 0.35));
+}
+
+.speed-card.is-up .speed-fill {
+  background: linear-gradient(90deg, rgba(255, 198, 60, 0.05), rgba(255, 198, 60, 0.35));
+}
+
+/* ---------- footer ---------- */
+
+.footer {
+  margin-top: 56px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+.footer a { color: var(--slime); }
+
+.footer-history {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  max-width: 460px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.footer-history strong { color: var(--gold); }
+.hoard {
+  width: min(400px, 90vw);
+  height: auto;
+  border-radius: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- arcade ---------- */
+
+.arcade-section { margin: 56px auto 0; max-width: 720px; }
+
+.arcade-intro {
+  margin: 10px auto 0;
+  max-width: 620px;
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.arcade-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.arcade-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.arcade-card:hover,
+.arcade-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--slime);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  outline: none;
+}
+
+.arcade-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(125, 255, 60, 0.12);
+  color: var(--slime);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.arcade-title {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+}
+
+.arcade-copy {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.arcade-card .btn { margin-top: auto; }
+
+/* ---------- toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 10px 18px;
+  border: 1px solid var(--slime-dim);
+  border-radius: 999px;
+  background: #12200a;
+  color: var(--slime);
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 900px) {
+  .stage { flex-wrap: wrap; }
+  .card { order: -1; flex-basis: 100%; }
+  .goblin { width: min(190px, 40vw); }
+  .command { font-size: 0.85rem; padding: 12px 12px; }
+  .speed-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* The badge is a pill, so it should stay on one line; the wide letter-spacing
+   is what pushes it to two on the narrowest phones. */
+@media (max-width: 380px) {
+  .established { letter-spacing: 0.06em; padding: 5px 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner { animation: none; background-color: #0f1a08; }
+  html { scroll-behavior: auto; }
+  .speed-runner, .speed-fill { transition: none; }
+}

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IP Goblin &mdash; the goblins found your public IP</title>
+<meta name="description" content="IP Goblin sniffs out your public IP address, country flag, ISP and location while two very rude goblins taunt you about it. Hoarding IP addresses since 2005.">
+<meta name="theme-color" content="#0d1408">
+<meta property="og:title" content="IP Goblin">
+<meta property="og:description" content="The goblins found your public IP address. Hoarding them since 2005.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ipgoblin.com/">
+<meta property="og:image" content="https://ipgoblin.com/assets/goblin-hoard.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://ipgoblin.com/">
+<link rel="icon" href="assets/favicon/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon/favicon-16x16.png">
+<link rel="apple-touch-icon" href="assets/favicon/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="preconnect" href="https://ipwho.is">
+<link rel="preconnect" href="https://flagcdn.com">
+<link rel="stylesheet" href="styles.css?v=ceb0180252">
+</head>
+<body>
+
+<div id="banner" class="banner" role="status" aria-live="polite">
+  <img id="banner-flag-left" class="banner-flag" alt="" hidden>
+  <span id="banner-ip" class="banner-ip">Summoning goblins&hellip;</span>
+  <img id="banner-flag-right" class="banner-flag" alt="" hidden>
+</div>
+
+<main class="wrap">
+
+  <header class="hero">
+    <h1 class="logo">IP<span>GOBLIN</span></h1>
+    <p class="tagline">Two goblins just went through your packets. They found things.</p>
+    <p class="established">Hoarding IP addresses since <strong>2005</strong></p>
+  </header>
+
+  <section class="stage">
+    <img class="goblin goblin-left" src="assets/crazy-goblin-1.gif" alt="A goblin cackling at your IP address" width="241" height="280" loading="eager">
+
+    <div class="card">
+      <p id="taunt" class="taunt">The goblins are rummaging through your headers&hellip;</p>
+
+      <h2 class="label">Your public IP address</h2>
+      <div class="copy-row">
+        <input id="ip-address" class="ip-address" type="text" value="detecting…" readonly aria-label="Your public IP address">
+        <button class="copy-btn" type="button" data-copy-target="#ip-address" aria-label="Copy IP address">Copy</button>
+      </div>
+
+      <div id="alt-ips"></div>
+
+      <h2 class="label">The goblin dossier</h2>
+      <dl id="details-grid" class="details-grid">
+        <div class="detail"><dt>Country</dt><dd id="d-country">…</dd></div>
+        <div class="detail"><dt>City</dt><dd id="d-city">…</dd></div>
+        <div class="detail"><dt>Region</dt><dd id="d-region">…</dd></div>
+        <div class="detail"><dt>ISP</dt><dd id="d-isp">…</dd></div>
+        <div class="detail"><dt>ASN</dt><dd id="d-asn">…</dd></div>
+        <div class="detail"><dt>Timezone</dt><dd id="d-timezone">…</dd></div>
+        <div class="detail"><dt>Coordinates</dt><dd id="d-loc">…</dd></div>
+        <div class="detail"><dt>Browser says</dt><dd id="d-browser">…</dd></div>
+      </dl>
+
+      <div class="card-actions">
+        <button id="copy-dossier" class="btn" type="button">Copy full dossier</button>
+        <a id="map-link" class="btn btn-ghost" href="#" target="_blank" rel="noopener noreferrer" hidden>See it on a map</a>
+        <button id="retaunt" class="btn btn-ghost" type="button">Taunt me again</button>
+      </div>
+
+      <p id="error" class="error" hidden></p>
+    </div>
+
+    <img class="goblin goblin-right" src="assets/crazy-goblin-2.gif" alt="A goblin pointing and laughing at your location" width="257" height="300" loading="eager">
+  </section>
+
+  <section class="terminal-section">
+    <h2 class="label center">Grab your IP from the command line</h2>
+    <div class="copy-row terminal-row">
+      <code id="command" class="command">curl -L api.ipgoblin.com</code>
+      <button class="copy-btn" type="button" data-copy-target="#command" aria-label="Copy curl command">Copy</button>
+    </div>
+    <p class="terminal-hint">
+      Add <code>/json</code> for the full dossier, <code>/taunt</code> to be insulted, or
+      <code>/help</code> for every endpoint. Use <code>curl -4</code> / <code>curl -6</code> to
+      force a protocol.
+    </p>
+  </section>
+
+  <section class="speed-section" id="speedtest">
+    <h2 class="label center">Make the goblins run</h2>
+    <p class="speed-intro">
+      The goblins will haul loot down from the nearest Cloudflare edge, then drag it back up,
+      and time themselves doing it. Then they will have opinions about your connection.
+    </p>
+
+    <div class="card speed-card" id="sp-card">
+      <div class="speed-track">
+        <div class="speed-fill" id="sp-fill"></div>
+        <img class="speed-runner" id="sp-runner" src="assets/crazy-goblin-1.gif"
+             alt="" width="241" height="280" loading="lazy">
+      </div>
+
+      <div class="speed-live">
+        <span class="speed-live-value" id="sp-live">0</span>
+        <span class="speed-live-unit">Mbps</span>
+      </div>
+      <p class="speed-phase" id="sp-phase">The goblins are asleep. Wake them.</p>
+
+      <dl class="speed-grid">
+        <div class="speed-stat"><dt>Download</dt><dd><span id="sp-down">—</span> <small>Mbps</small></dd></div>
+        <div class="speed-stat"><dt>Upload</dt><dd><span id="sp-up">—</span> <small>Mbps</small></dd></div>
+        <div class="speed-stat"><dt>Latency</dt><dd><span id="sp-ping">—</span></dd></div>
+        <div class="speed-stat"><dt>Jitter</dt><dd><span id="sp-jitter">—</span></dd></div>
+      </dl>
+
+      <p class="speed-verdict" id="sp-verdict" hidden></p>
+
+      <div class="card-actions">
+        <button id="sp-start" class="btn" type="button">Wake the goblins</button>
+        <button id="sp-copy" class="btn btn-ghost" type="button" hidden>Copy results</button>
+      </div>
+
+      <p id="sp-error" class="error" hidden></p>
+    </div>
+
+    <p class="speed-note">
+      Measures the link between you and your nearest Cloudflare edge, which is what every
+      browser-based speed test measures. It is capped at roughly 120&nbsp;MB down and 48&nbsp;MB up
+      per run, so mind your data if you are on a metered connection.
+    </p>
+  </section>
+
+  <section class="arcade-section" id="arcade">
+    <h2 class="label center">The goblin arcade</h2>
+    <p class="arcade-intro">
+      The goblins built an arcade in a spare corner of the network. No quarters, no accounts,
+      nothing kept. Just some very greedy goblins and questionable level design.
+    </p>
+
+    <div class="arcade-grid">
+      <a class="arcade-card" href="https://hoard.ipgoblin.com/" target="_blank" rel="noopener noreferrer">
+        <span class="arcade-badge">16-bit platformer</span>
+        <h3 class="arcade-title">GOBLIN HOARD</h3>
+        <p class="arcade-copy">
+          Whip, leap and loot your way out of the packet mines. Four levels, one extremely rude
+          boss, and a high score the goblins will hold over you forever.
+        </p>
+        <span class="btn">Play it &rarr;</span>
+      </a>
+
+      <a class="arcade-card" href="https://ghoultime.ipgoblin.com/" target="_blank" rel="noopener noreferrer">
+        <span class="arcade-badge">8-bit arcade</span>
+        <h3 class="arcade-title">GHOUL TIME</h3>
+        <p class="arcade-copy">
+          A ghoul chef assembling slime recipes in a haunted kitchen. Walk the slabs down, fill
+          all four cauldrons, and try not to get cornered.
+        </p>
+        <span class="btn">Play it &rarr;</span>
+      </a>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <img class="hoard" src="assets/goblin-hoard.jpg" alt="The goblin hoard" width="400" loading="lazy">
+    <p>Geo data by <a href="https://ipwho.is" target="_blank" rel="noopener noreferrer">ipwho.is</a> /
+       <a href="https://ipapi.co" target="_blank" rel="noopener noreferrer">ipapi.co</a> /
+       <a href="https://geojs.io" target="_blank" rel="noopener noreferrer">GeoJS</a>.
+       Flags by <a href="https://flagcdn.com" target="_blank" rel="noopener noreferrer">flagcdn</a>.</p>
+    <p>Nothing is logged here. The goblins only look, they never write it down.
+       <a href="https://github.com/RTPDataSolutions/ipgoblin.com" target="_blank" rel="noopener noreferrer">Source on GitHub</a>.</p>
+    <p class="footer-history">IP Goblin has been telling people their own IP address since
+       <strong>2005</strong>. The web moved on. The goblins did not.</p>
+  </footer>
+
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="app.js?v=b7306c00b7"></script>
+<script src="speedtest.js?v=4a3e614bb6"></script>
+</body>
+</html>
