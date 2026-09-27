@@ -36,11 +36,29 @@ export class Hud {
     ctx.restore();
   }
 
+  /**
+   * Soft dark backing for a HUD corner. The parallax moon drifts the whole
+   * width of a level, so sooner or later it sits directly behind the hearts
+   * and the life count becomes unreadable. Sky-independent contrast is
+   * cheaper than trying to park the backdrop art somewhere safe.
+   */
+  hudScrim(ctx, x, y, w, h) {
+    ctx.save();
+    ctx.globalAlpha = 0.42;
+    ctx.fillStyle = '#05080a';
+    ctx.fillRect(x + 1, y, w - 2, h);
+    ctx.fillRect(x, y + 1, w, h - 2);
+    ctx.restore();
+  }
+
   /* ------------------------------------------------------------- in-game  */
 
   draw(ctx, g) {
     const f = this.font;
     const heart = g.art.heart.frames[0].r;
+
+    this.hudScrim(ctx, 2, 2, 14 + g.player.maxHealth * 13, 30);
+    this.hudScrim(ctx, W - 72, 2, 70, 27);
 
     for (let i = 0; i < g.player.maxHealth; i++) {
       const on = i < g.player.health;
