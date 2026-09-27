@@ -53,7 +53,11 @@ export function moveY(e, level, dy, opts = {}) {
     const x0 = Math.floor(e.x / TS);
     const x1 = Math.floor((e.x + e.w - 1) / TS);
     if (step > 0) {
-      const ty = Math.floor((e.y + e.h - 1) / TS);
+      // Epsilon, not a whole pixel: positions are fractional, so `- 1` misses
+      // any overlap shallower than 1px. That let gravity sink a resting entity
+      // a fraction of a pixel per frame without ever reporting ground, which
+      // made the player bounce and flicker between its run and fall poses.
+      const ty = Math.floor((e.y + e.h - 0.0001) / TS);
       for (let tx = x0; tx <= x1; tx++) {
         const solid = level.isSolid(tx, ty);
         const platform = opts.platforms && !opts.dropThrough && level.isPlatform(tx, ty) &&
@@ -555,6 +559,223 @@ export class Knight extends Enemy {
   }
 }
 
+/**
+ * The Vampire: floats, dissolves into mist to reposition, then swoops.
+ *
+ * The mist phase is invulnerable and clearly signposted by the sprite, so the
+ * fight is about waiting for it to re-form rather than mashing the whip.
+ */
+export class Vampire extends Enemy {
+  constructor(g, cx, feetY) {
+    super(g, cx - 7, feetY - 42, 15, 26);
+    this.hp = this.maxHp = 3;
+    this.score = 500;
+    this.gore = [C.capeL, C.cape, C.bloodL];
+    this.stompable = false;
+    // Hovers at head height, which is inside the whip's arc.
+    this.homeY = feetY - this.h - 16;
+    this.y = this.homeY;
+    this.state = 'hover';
+    this.timer = 1.8 + Math.random() * 0.8;
+    this.phase = Math.random() * Math.PI * 2;
+  }
+
+  get misting() { return this.state === 'mist'; }
+
+  hurt(amount, dir, source) {
+    if (this.misting || this.dead) {
+      // The whip passes straight through vapour.
+      this.g.sound.sfx('block');
+      this.g.fx.burst(this.cx, this.cy, 8, {
+        speed: 80, life: 0.35, g: -30, color: [C.capeL, C.cape], size: 2,
+      });
+      return false;
+    }
+    return super.hurt(amount, dir, source);
+  }
+
+  update(dt) {
+    this.t += dt;
+    this.tickHurt(dt);
+    this.timer -= dt;
+    const p = this.g.player;
+    if (p && !p.dead) this.face = p.cx < this.cx ? -1 : 1;
+
+    switch (this.state) {
+      case 'hover': {
+        // Drifts in, unhurried, so the player has time to line up a swing.
+        if (p && !p.dead) this.x += Math.sign(p.cx - this.cx) * 26 * dt;
+        this.y = this.homeY + Math.sin(this.t * 2 + this.phase) * 4;
+        if (this.timer <= 0) {
+          this.state = 'mist';
+          this.timer = 0.85;
+          this.g.sound.sfx('charge');
+          this.g.fx.burst(this.cx, this.cy, 18, {
+            speed: 110, life: 0.5, g: -40, color: [C.capeL, C.cape, C.capeD], size: 2,
+          });
+        }
+        break;
+      }
+
+      case 'mist': {
+        // Slides to the player's side while untouchable.
+        if (p && !p.dead) {
+          const target = p.cx + (p.cx < this.cx ? 34 : -34);
+          this.x += (target - this.cx) * Math.min(1, 3 * dt);
+          this.y += ((this.homeY - 6) - this.y) * Math.min(1, 3 * dt);
+        }
+        if (this.t % 0.05 < dt) {
+          this.g.fx.trail(this.cx + (Math.random() - 0.5) * 16, this.cy + (Math.random() - 0.5) * 18, C.cape);
+        }
+        if (this.timer <= 0) {
+          this.state = 'loom';
+          this.timer = 0.45;
+          this.g.fx.ring(this.cx, this.cy, 18, C.capeL, 0.3);
+        }
+        break;
+      }
+
+      case 'loom':
+        // Re-formed and vulnerable: the window to punish it.
+        this.y = this.homeY - 6 + Math.sin(this.t * 9) * 1.5;
+        if (this.timer <= 0) {
+          this.state = 'swoop';
+          this.timer = 0.75;
+          this.swoopVy = 150;
+          this.g.sound.sfx('shoot');
+        }
+        break;
+
+      case 'swoop': {
+        this.x += this.face * 132 * dt;
+        this.y += this.swoopVy * dt;
+        this.swoopVy -= 360 * dt;
+        if (this.t % 0.06 < dt) this.g.fx.trail(this.cx, this.cy, C.capeD);
+        // Bail out of the dive on contact with geometry.
+        if (this.g.level.solidInRect(this.x, this.y, this.w, this.h)) this.timer = 0;
+        if (this.timer <= 0) {
+          this.state = 'hover';
+          this.timer = 1.8 + Math.random() * 0.8;
+        }
+        break;
+      }
+
+      default:
+        this.state = 'hover';
+        break;
+    }
+
+    // Never let it drift into geometry or out of the level.
+    this.x = Math.max(4, Math.min(this.g.level.pixelW - this.w - 4, this.x));
+    if (this.g.level.solidInRect(this.x, this.y, this.w, this.h)) {
+      this.y = Math.min(this.y, this.homeY);
+    }
+  }
+
+  draw(ctx, cam) {
+    const art = this.misting ? this.g.art.vampireMist : this.g.art.vampire;
+    const idx = Math.floor(this.t * (this.state === 'swoop' ? 14 : 7)) % art.frames.length;
+    drawSprite(ctx, cam, art, idx, this.x, this.y, this.face > 0, this.flashing);
+  }
+}
+
+/**
+ * The Ghoul: slow, relentless, and hits hard when it finally reaches you.
+ *
+ * It tracks the player rather than patrolling blindly, so the threat is being
+ * cornered by something that never stops coming. The lunge is telegraphed.
+ */
+export class Ghoul extends Enemy {
+  constructor(g, cx, feetY) {
+    super(g, cx - 7, feetY - 22, 15, 22);
+    this.hp = this.maxHp = 3;
+    this.score = 350;
+    this.gore = [C.rotL, C.rot, C.bile];
+    this.state = 'shamble';
+    this.timer = 0;
+    this.cool = 1;
+    this.face = Math.random() < 0.5 ? -1 : 1;
+  }
+
+  update(dt) {
+    this.t += dt;
+    this.tickHurt(dt);
+    this.timer -= dt;
+    this.cool -= dt;
+    const p = this.g.player;
+
+    switch (this.state) {
+      case 'windup':
+        this.vx *= Math.pow(0.8, dt * 60);
+        moveX(this, this.g.level, this.vx * dt);
+        if (this.t % 0.1 < dt) {
+          this.g.fx.particle({
+            x: this.cx + this.face * 6, y: this.y + 8,
+            vx: this.face * 20, vy: -20 - Math.random() * 20,
+            life: 0.5, g: 90, drag: 0.94, size: 2, color: C.bile,
+          });
+        }
+        if (this.timer <= 0) {
+          this.state = 'lunge';
+          this.timer = 0.34;
+          this.vx = this.face * 215;
+          this.g.sound.sfx('whip');
+        }
+        break;
+
+      case 'lunge':
+        if (moveX(this, this.g.level, this.vx * dt)) this.timer = 0;
+        if (this.t % 0.05 < dt) this.g.fx.trail(this.cx, this.cy, C.rotD);
+        if (this.timer <= 0) {
+          this.state = 'recover';
+          this.timer = 0.5;
+          this.vx = 0;
+          this.cool = 1.5;
+        }
+        break;
+
+      case 'recover':
+        this.vx *= Math.pow(0.7, dt * 60);
+        moveX(this, this.g.level, this.vx * dt);
+        if (this.timer <= 0) this.state = 'shamble';
+        break;
+
+      default: {
+        // Hunts the player when one is in range and roughly level, otherwise
+        // shuffles back and forth.
+        let hunting = false;
+        if (p && !p.dead) {
+          const dx = p.cx - this.cx;
+          if (Math.abs(dx) < 150 && Math.abs(p.cy - this.cy) < 40) {
+            hunting = true;
+            this.face = Math.sign(dx) || this.face;
+            if (Math.abs(dx) < 36 && this.cool <= 0 && this.onGround) {
+              this.state = 'windup';
+              this.timer = 0.36;
+              this.g.sound.sfx('charge');
+              break;
+            }
+          }
+        }
+        // Still respects ledges, so it will not walk itself into a pit.
+        this.patrol(dt, hunting ? 40 : 24);
+        break;
+      }
+    }
+
+    this.fall(dt);
+  }
+
+  draw(ctx, cam) {
+    const lunging = this.state === 'windup' || this.state === 'lunge';
+    const art = lunging ? this.g.art.ghoulLunge : this.g.art.ghoul;
+    const idx = lunging ? 0 : Math.floor(this.t * 5) % art.frames.length;
+    // Flash white on the wind-up so the lunge is never a surprise.
+    const tell = this.state === 'windup' && Math.floor(this.t * 20) % 2 === 0;
+    drawSprite(ctx, cam, art, idx, this.x, this.y, this.face > 0, this.flashing || tell);
+  }
+}
+
 export class Turret extends Enemy {
   constructor(g, cx, feetY) {
     super(g, cx - 9, feetY - 20, 18, 20);
@@ -767,4 +988,12 @@ export class Boss extends Enemy {
   }
 }
 
-export const ENEMY_CLASSES = { slime: Slime, bat: Bat, knight: Knight, turret: Turret, boss: Boss };
+export const ENEMY_CLASSES = {
+  slime: Slime,
+  bat: Bat,
+  knight: Knight,
+  vampire: Vampire,
+  ghoul: Ghoul,
+  turret: Turret,
+  boss: Boss,
+};

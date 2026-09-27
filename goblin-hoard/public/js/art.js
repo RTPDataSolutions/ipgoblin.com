@@ -41,6 +41,25 @@ export const C = {
   batD: '#3a1f57',
   bat: '#7b3fb0',
   batL: '#c079e8',
+  // vampire
+  capeD: '#3a0a1c',
+  cape: '#8c1234',
+  capeL: '#c82a52',
+  noir: '#181022',
+  noirL: '#30203f',
+  paleD: '#a8967c',
+  pale: '#ded2be',
+  paleL: '#f6efe2',
+  bloodL: '#ff4d5e',
+  // ghoul - deliberately cold and grey. An undead green would read as the
+  // player's own palette at a glance, which is the one thing it must not do.
+  rotD: '#2e2a3d',
+  rot: '#585070',
+  rotL: '#8d84a6',
+  ragD: '#2b2620',
+  rag: '#4e4638',
+  ragL: '#776b56',
+  bile: '#c8f24d',
   // fire / energy
   emberD: '#a0300c',
   ember: '#ef7420',
@@ -212,9 +231,15 @@ function goblinFrames() {
       footB: footAt(a + Math.PI),
       handF: handAt(a + Math.PI),
       handB: handAt(a),
-      bob: -Math.abs(Math.sin(a)) > -0.5 ? 0 : -1,
+      // Body rides highest when the legs are gathered under it and lowest at
+      // full stride. Written as a plain product: `-Math.abs(s) > -0.5` parses
+      // as `(-Math.abs(s)) > -0.5`, which snapped the whole torso a pixel up
+      // and down like a square wave instead of easing through the step.
+      bob: -Math.round(Math.abs(Math.sin(a))),
       lean: 1,
-      ear: Math.sin(a) > 0 ? -1 : 1,
+      // The ear trails the stride. A `sin > 0 ? -1 : 1` flip jumped it two
+      // pixels between adjacent frames, which read as a twitch.
+      ear: -Math.round(Math.sin(a) * 1.5),
       mouth: 1,
       eye: 'squint',
     }));
@@ -370,6 +395,193 @@ function knightFrames() {
     frames.push(finish(g));
   }
   return set(frames, 14, 22, 27);
+}
+
+/** Router Golem: bolted to the wall, spits packets at you. */
+
+/**
+ * The Vampire: a floating count in a billowing cape.
+ *
+ * The silhouette does the work — a high pointed collar and a scalloped cape
+ * read at this size even when the face is only a handful of pixels.
+ * `mist` fades it to a scatter of particles for its invulnerable phase.
+ */
+function vampireFrames(mist) {
+  const frames = [];
+  for (let i = 0; i < 4; i++) {
+    const t = i / 4;
+    const g = new Grid(34, 36);
+    const cx = 17;
+    const bob = Math.round(Math.sin(t * Math.PI * 2) * 1.5);
+    const billow = 1 + Math.sin(t * Math.PI * 2) * 0.2;
+    const headY = 9 + bob;
+    const shY = 16 + bob;
+    const hemY = 31 + bob;
+
+    if (mist) {
+      // Dissolving: a loose cloud of cape-coloured motes, no solid body.
+      const r = rng(900 + i * 37);
+      for (let n = 0; n < 130; n++) {
+        const a = r() * Math.PI * 2;
+        const rad = r() * 13;
+        const px = cx + Math.cos(a) * rad * 1.15;
+        const py = shY + Math.sin(a) * rad * 1.3 - 2;
+        const c = r() < 0.3 ? C.capeL : r() < 0.7 ? C.cape : C.capeD;
+        if (r() < 0.62) g.set(px, py, c);
+      }
+      for (let n = 0; n < 6; n++) g.set(cx - 5 + n * 2, headY + 2, C.bloodL);
+      frames.push(g.outline(C.ink, true));
+      continue;
+    }
+
+    // --- cape, behind everything
+    const cw = 14 * billow;
+    g.tri(cx, shY - 5, cx - cw, shY + 1, cx - cw * 0.45, hemY, C.capeD);
+    g.tri(cx, shY - 5, cx + cw, shY + 1, cx + cw * 0.45, hemY, C.capeD);
+    g.tri(cx, shY - 4, cx - cw * 0.72, shY + 3, cx - cw * 0.3, hemY - 3, C.cape);
+    g.tri(cx, shY - 4, cx + cw * 0.72, shY + 3, cx + cw * 0.3, hemY - 3, C.cape);
+    // scalloped hem
+    for (let s = -2; s <= 2; s++) {
+      const hx = cx + s * 5.5 * billow;
+      g.tri(hx - 2.6, hemY - 4, hx + 2.6, hemY - 4, hx, hemY + 2 + (s % 2 ? 1 : 0), C.capeD);
+    }
+
+    // --- body: a dark wedge, narrow at the waist
+    g.tri(cx - 6, shY - 2, cx + 6, shY - 2, cx, hemY - 2, C.noir);
+    g.rect(cx - 5, shY - 2, 11, 8, C.noir);
+    g.rect(cx - 3, shY, 6, 9, C.noirL);
+    // crimson sash + brooch
+    g.rect(cx - 4, shY + 7, 9, 2, C.cape);
+    g.set(cx, shY + 7, C.gold);
+
+    // --- the collar: the single most recognisable shape here
+    g.tri(cx - 4, headY + 5, cx - 10 * billow, headY - 6, cx - 3, headY - 1, C.capeD);
+    g.tri(cx + 4, headY + 5, cx + 10 * billow, headY - 6, cx + 3, headY - 1, C.capeD);
+    g.tri(cx - 4, headY + 4, cx - 8 * billow, headY - 4, cx - 3, headY, C.cape);
+    g.tri(cx + 4, headY + 4, cx + 8 * billow, headY - 4, cx + 3, headY, C.cape);
+
+    // --- head
+    g.ellipse(cx, headY + 1, 4.4, 5, C.pale);
+    g.ellipse(cx, headY - 1, 4, 3.4, C.paleL);
+    g.ellipse(cx, headY + 4, 3.4, 2.6, C.paleD);
+    // slicked hair with a widow's peak
+    g.ellipse(cx, headY - 3, 4.8, 3, C.noir);
+    g.rect(cx - 5, headY - 4, 10, 2, C.noir);
+    g.tri(cx - 2, headY - 2, cx + 2, headY - 2, cx, headY + 1, C.noir);
+    g.set(cx - 3, headY - 3, C.noirL);
+    // eyes and fangs
+    g.rect(cx - 3, headY, 2, 2, C.eyeP);
+    g.rect(cx + 2, headY, 2, 2, C.eyeP);
+    g.set(cx - 3, headY, C.bloodL);
+    g.set(cx + 3, headY, C.bloodL);
+    g.rect(cx - 2, headY + 4, 5, 1, C.capeD);
+    g.set(cx - 2, headY + 5, C.tooth);
+    g.set(cx + 2, headY + 5, C.tooth);
+
+    // --- clawed hands emerging from the cape
+    const reach = Math.round(Math.sin(t * Math.PI * 2) * 1.5);
+    g.circle(cx - 9, shY + 6 + reach, 2, C.pale);
+    g.circle(cx + 9, shY + 6 - reach, 2, C.pale);
+    g.set(cx - 11, shY + 7 + reach, C.paleD);
+    g.set(cx + 11, shY + 7 - reach, C.paleD);
+
+    frames.push(finish(g));
+  }
+  return set(frames, 15, 26, 33);
+}
+
+/**
+ * The Ghoul: a shambling corpse with arms longer than its legs.
+ *
+ * Hunched so its spine is the highest point and its head reads low and
+ * forward, which is what separates it from the upright Knight at a glance.
+ */
+function ghoulFrames(lunging) {
+  const frames = [];
+  for (let i = 0; i < 4; i++) {
+    const t = i / 4;
+    const g = new Grid(30, 30);
+    const cx = 13;
+    const feet = 27;
+
+    // Shamble: an uneven, dragging gait. The lunge is a single stretched pose
+    // with the jaw wide and both claws thrown forward.
+    const step = lunging ? 4.5 : Math.cos(t * Math.PI * 2) * 3.4;
+    const bob = lunging ? -1 : (Math.sin(t * Math.PI * 2) > 0.4 ? -1 : 0);
+    const lean = lunging ? 4 : 1;
+    const hipY = 20 + bob;
+    // The spine arches well above the head - that hunch is the silhouette.
+    const spineY = 10 + bob;
+    const headX = cx + lean + 5;
+    const headY = 15 + bob + (lunging ? -2 : 0);
+
+    // --- thin legs, one dragging behind
+    g.limb(cx - 1, hipY, cx - 2 - step, feet - 1, 3, C.rotD, C.rotD, 0);
+    g.rect(cx - 4 - step, feet - 1, 6, 2, C.ragD);
+    g.limb(cx + 1, hipY, cx + 1 + step, feet - 1, 3, C.rot, C.rot, 0);
+    g.rect(cx - 1 + step, feet - 1, 6, 2, C.ragD);
+
+    // --- hunched back: a humped shell arcing over the shoulders
+    g.ellipse(cx, spineY + 4, 6.6, 6.4, C.rot);
+    g.ellipse(cx - 1, spineY + 1, 5.4, 3.6, C.rotL);
+    // knobbled spine along the top of the hump
+    for (let s = 0; s < 4; s++) g.set(cx - 4 + s * 2, spineY - 2 + Math.abs(s - 1.5), C.rotL);
+
+    // --- ribcage, bone-bright so the torso does not read as a blob
+    for (let rb = 0; rb < 3; rb++) {
+      const ry = spineY + 5 + rb * 3;
+      g.rect(cx, ry, 7, 1, C.bone);
+      g.set(cx + 7, ry, C.rotD);
+      g.set(cx - 1, ry, C.rotD);
+    }
+    g.rect(cx + 2, spineY + 5, 1, 9, C.paleD);
+
+    // --- tattered loincloth
+    g.rect(cx - 6, hipY - 4, 12, 4, C.rag);
+    g.rect(cx - 6, hipY - 4, 12, 1, C.ragL);
+    for (let s = 0; s < 5; s++) g.rect(cx - 6 + s * 3, hipY, 2, 1 + ((s + i) % 3), C.ragD);
+
+    // --- head: low, thrust forward, mostly jaw
+    g.ellipse(headX, headY, 4.6, 3.6, C.rot);
+    g.ellipse(headX, headY - 2, 4, 2.2, C.rotL);
+    // long gaping jaw hinged at the back of the skull
+    const gape = lunging ? 5 : 3;
+    g.tri(headX - 2, headY + 1, headX + 6, headY + 1, headX + 4, headY + gape, C.rotD);
+    g.rect(headX - 2, headY + 1, 8, gape - 1, C.ink);
+    g.ellipse(headX + 1, headY + gape, 3.4, 1.6, C.rot);
+    for (let tth = 0; tth < 4; tth++) {
+      g.set(headX - 1 + tth * 2, headY + 1, C.tooth);
+      g.set(headX - 1 + tth * 2, headY + gape - 1, C.tooth);
+    }
+    // deep sockets with a bile glow
+    g.rect(headX - 2, headY - 2, 3, 3, C.ink);
+    g.rect(headX + 2, headY - 2, 3, 3, C.ink);
+    g.set(headX - 1, headY - 1, C.bile);
+    g.set(headX + 3, headY - 1, C.bile);
+    // sunken cheek and a few lank strands
+    g.set(headX + 5, headY, C.rotD);
+    g.set(headX - 3, headY - 4, C.ragD);
+    g.set(headX, headY - 5, C.ragD);
+
+    // --- arms long enough that the knuckles drag
+    const swing = lunging ? 0 : Math.sin(t * Math.PI * 2) * 3;
+    const fx = lunging ? cx + 15 : cx + 8 + swing;
+    const fy = lunging ? headY + 3 : 23 + swing;
+    const bx = cx - 10;
+    const by = 23 - swing;
+    g.limb(cx - 3, spineY + 3, bx, by, 3, C.rotD, C.rotD, 2);
+    g.limb(cx + 3, spineY + 3, fx, fy, 3, C.rot, C.rotL, 2.4);
+    // three bone claws on each hand
+    for (let cl = -1; cl <= 1; cl++) {
+      g.set(fx + 3, fy + cl * 2, C.bone);
+      g.set(fx + 4, fy + cl * 2 + (cl > 0 ? 1 : 0), C.bone);
+      g.set(bx - 3, by + cl * 2, C.bone);
+    }
+
+    frames.push(finish(g));
+    if (lunging) break;   // the lunge is one held pose
+  }
+  return set(frames, 15, 22, 27);
 }
 
 /** Router Golem: bolted to the wall, spits packets at you. */
@@ -596,6 +808,10 @@ export function buildArt() {
     slime: slimeFrames(),
     bat: batFrames(),
     knight: knightFrames(),
+    vampire: vampireFrames(false),
+    vampireMist: vampireFrames(true),
+    ghoul: ghoulFrames(false),
+    ghoulLunge: ghoulFrames(true),
     turret: turretFrames(),
     boss: bossFrames(),
     shot: shotFrames(C.ember, C.emberL, 3),

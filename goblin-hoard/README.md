@@ -12,7 +12,7 @@ and costs nothing per request (static assets are not billed as Worker invocation
 
 Live at **https://hoard.ipgoblin.com**.
 
-![GOBLIN HOARD gameplay: the goblin mid-whip on a floating platform above the mossy ruins, with a gem and coins overhead and the hearts/score HUD on top](docs/screenshot.png)
+![GOBLIN HOARD gameplay: the goblin whipping open a chest for 250 points in the Firewall Keep, a vampire hovering overhead, under an inferno sky](docs/screenshot.png)
 
 ## How to play
 
@@ -26,6 +26,9 @@ Live at **https://hoard.ipgoblin.com**.
 
 A gamepad works if one is plugged in, and touch controls appear on coarse-pointer devices.
 
+You start with **eight lives** and four hearts. Hearts refill on pickup; a life is spent when they
+run out, and the run ends when the last one goes.
+
 The whip swings in an overhead arc, so it reaches things above you as well as in front. You can
 also drop on an enemy's head. Chain kills within two and a half seconds to build a multiplier.
 
@@ -35,11 +38,13 @@ also drop on an enemy's head. Chain kills within two and a half seconds to build
 | --- | --- |
 | Packet Slime | Hops along a ledge. Two hits. |
 | Byte Bat | Hovers, then dives when you come within range. One hit. |
+| Ghoul | Shambles after you and never stops. Telegraphs a lunge, then throws itself at you. Three hits. |
+| Vampire | Floats, dissolves into mist to reposition, then swoops. **It cannot be hit while it is mist** — wait for it to re-form. Three hits. |
 | Firewall Knight | **The shield blocks anything from the front.** Hit it from behind, or land on it. |
 | Router Golem | Bolted down, spits packets when you are roughly level with it. |
 | The Root Daemon | The level-four boss. It drifts and shoots, then slams the floor — the slam is your window. |
 
-**Scoring** — 25 a coin, 250 a gem, 2500 a goblin idol (there is one hidden up high), 150–400 an
+**Scoring** — 25 a coin, 250 a gem, 2500 a goblin idol (there is one hidden up high), 150–500 an
 enemy times the chain multiplier, 5000 the boss, plus a clear bonus for leftover health and lives.
 The high score is kept in `localStorage`.
 
@@ -94,6 +99,40 @@ fill the screen, because rounding 1.9 down to 1 would waste half a phone display
 
 The loop is a fixed 60 Hz timestep with a capped accumulator, so physics never changes with the
 refresh rate.
+
+**There are two cameras, and mixing them up makes the game shake.** `camI` is whole-pixel and
+draws the tile grid so tiles stay crisp. `camF` keeps the fractional part and draws everything
+that moves: entities round `position - camF`, i.e. the offset itself, so a sprite holding still
+relative to the camera lands on the same pixel every frame. Round the camera and the sprite
+separately and you get two independent staircases drifting in and out of phase, which reads as
+the character stuttering backwards while running forwards. Particles are single pixels and use
+`camI`, or the canvas anti-aliases them into smudges.
+
+The other half of holding still is in the physics. Gravity is pinned to a small constant while
+grounded rather than allowed to accumulate, and the downward collision probe tests
+`y + h - 0.0001` rather than `y + h - 1`: positions are fractional, so subtracting a whole pixel
+misses any overlap shallower than 1px. Without both, a resting entity sinks a fraction of a pixel
+every frame, never reports ground, and bounces — which also flickers the player between its run
+and fall poses.
+
+### Colour
+
+Each theme in `js/tiles.js` carries two hues, not one. `accent` is the obvious one — torch light,
+lit windows, the exit portal — and `accent2` is a contrasting hue sprinkled sparsely as mineral
+flecks through the rock and as mosaic chips in the back walls. A few saturated pixels per tile
+lift a grey mass without competing with the goblin for attention.
+
+Three other things do most of the work:
+
+- **Five-stop skies** rather than a flat gradient, so a backdrop travels through several hues.
+- **A `fogLayer`** of dithered haze between the distant and mid parallax planes. Cheap
+  atmospheric perspective, and most of what stops the backdrops looking monochrome.
+- **Two variants per autotile mask.** A long flat floor is one mask repeated for the whole level,
+  so a single tile per mask turns the ground into a visibly stamped pattern.
+
+Lit edges are dithered bands rather than solid rows. An unbroken row of the brightest colour
+across the level reads as a neon strip laid on the floor; letting the tones interleave makes the
+same edge read as light falling on rock.
 
 ### Audio
 

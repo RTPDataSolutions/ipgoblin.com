@@ -20,9 +20,13 @@ const FLUTTER_VEL = 296;
 const GRAVITY = 1500;
 const GRAVITY_APEX = 1080;      // lighter near the top of a jump
 const GRAVITY_FALL = 1750;
+const GROUND_STICK = 40;        // gentle downward pressure while grounded
 const MAX_FALL = 430;
 const COYOTE = 0.1;
 const BUFFER = 0.13;
+// An airborne blip shorter than this keeps the ground pose, so a seam in the
+// floor cannot flicker the goblin into a falling frame mid-stride.
+const AIR_POSE_DELAY = 0.06;
 
 const WINDUP = 0.07;
 const ACTIVE = 0.11;
@@ -36,6 +40,7 @@ export class Player extends Entity {
     this.health = 4;
     this.face = 1;
     this.onGround = false;
+    this.airT = 0;
     this.coyote = 0;
     this.buffer = 0;
     this.jumps = 0;
@@ -67,6 +72,7 @@ export class Player extends Entity {
     this.attackT = 0;
     this.health = this.maxHealth;
     this.jumps = 0;
+    this.airT = 0;
     this.enteringDoor = false;
   }
 
@@ -194,34 +200,43 @@ export class Player extends Entity {
     }
 
     /* --- gravity and movement --- */
-    let gScale = GRAVITY;
-    if (this.vy < 0) gScale = GRAVITY;
-    else if (Math.abs(this.vy) < 46) gScale = GRAVITY_APEX;
-    else gScale = GRAVITY_FALL;
-    this.vy = Math.min(MAX_FALL, this.vy + gScale * dt);
+    // While grounded, gravity is pinned to a small "stick" rather than allowed
+    // to accumulate. It is still enough to detect walking off a ledge, but it
+    // stops a resting goblin from sinking into the floor and being shoved back
+    // out every frame.
+    if (this.onGround && this.vy >= 0) {
+      this.vy = GROUND_STICK;
+    } else {
+      let gScale = GRAVITY;
+      if (this.vy > 0) gScale = Math.abs(this.vy) < 46 ? GRAVITY_APEX : GRAVITY_FALL;
+      this.vy = Math.min(MAX_FALL, this.vy + gScale * dt);
+    }
 
     if (this.dropTimer > 0) this.dropTimer -= dt;
 
     moveX(this, this.g.level, this.vx * dt);
     const wasAir = !this.onGround;
+    const impactVy = this.vy;
     const res = moveY(this, this.g.level, this.vy * dt, {
       platforms: true,
       dropThrough: this.dropTimer > 0,
     });
 
     if (res === 'ground') {
-      if (wasAir && this.vy > 190) {
+      if (wasAir && impactVy > 190) {
         this.g.fx.landPuff(this.cx, this.y + this.h);
         this.g.sound.sfx('land');
-        this.g.fx.shake(Math.min(2.2, this.vy / 220), 0.1);
+        this.g.fx.shake(Math.min(2.2, impactVy / 220), 0.1);
       }
       this.onGround = true;
+      this.airT = 0;
       this.jumps = 0;
       this.coyote = COYOTE;
       this.vy = 0;
     } else {
       if (this.onGround) this.coyote = COYOTE;
       this.onGround = false;
+      this.airT += dt;
       if (res === 'ceiling') this.vy = Math.max(this.vy, 30);
     }
 
@@ -367,7 +382,10 @@ export class Player extends Entity {
       const p = this.attackPhase;
       return [art.attack, p === 'windup' ? 0 : p === 'active' ? 1 : 2];
     }
-    if (!this.onGround) return this.vy < -20 ? [art.jump, 0] : [art.fall, 0];
+    // Committed air time, not the raw flag: a real jump reads instantly from
+    // its velocity, while a momentary loss of footing keeps the ground pose.
+    const airborne = !this.onGround && (this.airT > AIR_POSE_DELAY || Math.abs(this.vy) > 90);
+    if (airborne) return this.vy < -20 ? [art.jump, 0] : [art.fall, 0];
     if (this.crouching) return [art.crouch, 0];
     if (Math.abs(this.vx) > 24) return [art.run, Math.floor(this.runPhase) % art.run.frames.length];
     return [art.idle, Math.floor(this.t * 3.5) % art.idle.frames.length];

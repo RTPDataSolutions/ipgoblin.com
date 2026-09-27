@@ -114,6 +114,18 @@ export class Hud {
 
   /* -------------------------------------------------------------- screens */
 
+  /** Dark band behind the title text, so it reads over the busy parallax. */
+  titleScrim(ctx) {
+    ctx.save();
+    ctx.globalAlpha = 0.62;
+    ctx.fillStyle = '#070c05';
+    ctx.fillRect(0, 92, W, 96);
+    ctx.restore();
+    ctx.fillStyle = C.skinD;
+    ctx.fillRect(0, 92, W, 1);
+    ctx.fillRect(0, 187, W, 1);
+  }
+
   title(ctx, g) {
     const f = this.font;
     const t = g.time;
@@ -124,22 +136,23 @@ export class Hud {
       color: C.skinL, align: 'center', scale: 5, outline: '#0b1207',
       wave: t * 2.4, waveAmp: 1,
     });
-    f.draw(ctx, 'HOARD', W / 2, 53, {
+    f.draw(ctx, 'HOARD', W / 2, 50, {
       color: C.gold, align: 'center', scale: 5, outline: '#0b1207',
       wave: t * 2.4 + 1.6, waveAmp: 1,
     });
-    f.draw(ctx, 'A 16-BIT SMASH AND GRAB', W / 2, 97, {
-      color: C.skin, align: 'center', shadow: '#000000',
+
+    f.draw(ctx, 'A 16-BIT SMASH AND GRAB', W / 2, 98, {
+      color: C.skinL, align: 'center', shadow: '#000000',
     });
 
     if (g.best > 0) {
-      f.draw(ctx, `BEST ${String(g.best).padStart(7, '0')}`, W / 2, 110, {
+      f.draw(ctx, `BEST ${String(g.best).padStart(7, '0')}`, W / 2, 112, {
         color: C.cyanL, align: 'center', shadow: '#000000',
       });
     }
 
     if (Math.floor(t * 1.8) % 2 === 0) {
-      f.draw(ctx, g.input.usedTouch ? 'TAP TO START' : 'PRESS ENTER TO START', W / 2, 126, {
+      f.draw(ctx, g.input.usedTouch ? 'TAP TO START' : 'PRESS ENTER TO START', W / 2, 128, {
         color: C.goldL, align: 'center', scale: 2, shadow: '#000000',
       });
     }
@@ -148,10 +161,10 @@ export class Hud {
       ? ['MOVE  LEFT / RIGHT PADS', 'JUMP  TAP AGAIN TO FLUTTER', 'WHIP  THE DIAMOND BUTTON']
       : ['MOVE  ARROWS / WASD', 'JUMP  SPACE  (TWICE TO FLUTTER)', 'WHIP  X     PAUSE  P     MUTE  M'];
     lines.forEach((line, i) => {
-      f.draw(ctx, line, W / 2, 149 + i * 11, { color: C.skin, align: 'center', shadow: '#000000' });
+      f.draw(ctx, line, W / 2, 152 + i * 11, { color: C.skinL, align: 'center', shadow: '#000000' });
     });
 
-    f.draw(ctx, 'IPGOBLIN.COM', W - 4, 205, { color: C.skinD, align: 'right', shadow: '#000000' });
+    f.draw(ctx, 'IPGOBLIN.COM', W - 4, 205, { color: C.skin, align: 'right', shadow: '#000000' });
   }
 
   levelIntro(ctx, g) {

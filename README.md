@@ -306,7 +306,8 @@ Workers share. The site links to both from the *goblin arcade* section.
 ### goblin-hoard/
 
 [hoard.ipgoblin.com](https://hoard.ipgoblin.com) — **GOBLIN HOARD**, a 16-bit side-scrolling
-action platformer: run, flutter-jump, whip, and loot four levels ending in a boss.
+action platformer: run, flutter-jump, whip, and loot four levels ending in a boss. Slimes, bats,
+ghouls, vampires, shield knights and turrets stand in the way; you get eight lives.
 
 Vanilla JS, no dependencies and no build step. Notably it ships **no binary assets** — every
 sprite, tile, parallax backdrop, font glyph and note of music is generated in code at load, which
@@ -314,7 +315,8 @@ is why the whole game is roughly 100 KB of source and nothing else.
 
 Levels are assembled from hand-authored 24x18 character grids, and the geometry is written against
 the movement: a running jump clears 4.4 tiles across and 2.3 up. Edit a level without knowing that
-and you will quietly make it impossible. `goblin-hoard/README.md` has the full detail.
+and you will quietly make it impossible. `goblin-hoard/README.md` has the full detail, including
+the two-camera rounding rule that keeps the sprite from stuttering.
 
 ```sh
 cd goblin-hoard

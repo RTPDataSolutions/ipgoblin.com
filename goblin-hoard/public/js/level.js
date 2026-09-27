@@ -27,6 +27,8 @@ const CHAR_SPAWN = {
   S: 'slime',
   B: 'bat',
   K: 'knight',
+  V: 'vampire',
+  G: 'ghoul',
   R: 'turret',
   X: 'boss',
   D: 'door',
@@ -203,10 +205,10 @@ export class Level {
 
         switch (t) {
           case T.SOLID:
-            ctx.drawImage(tileset.solid[this.masks[i]], px, py);
+            ctx.drawImage(tileset.solid[this.masks[i]][this.variant[i]], px, py);
             break;
           case T.PLATFORM:
-            ctx.drawImage(tileset.platform, px, py);
+            ctx.drawImage(tileset.platform[this.variant[i]], px, py);
             break;
           case T.SPIKE:
             ctx.drawImage(tileset.spike, px, py);
