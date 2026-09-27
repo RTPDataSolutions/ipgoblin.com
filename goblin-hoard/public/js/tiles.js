@@ -48,36 +48,47 @@ export const THEMES = [
     name: 'The Mossy Ruins',
     rockD: '#2a2f26', rock: '#4a5240', rockL: '#6e7a5c',
     capD: '#2c6420', cap: '#4e9a2d', capL: '#8ede4f',
-    backD: '#161c14', back: '#222c1d',
+    backD: '#181f16', back: '#26331f',
     accent: C.gold,
-    sky: ['#0a1428', '#17304a', '#2b5566', '#4a7a5e'],
+    // Secondary hue, sprinkled through the rock as mineral flecks and used
+    // for the backdrop's small details. It is what stops each theme reading
+    // as a single colour with the brightness turned up and down.
+    accent2: '#ff7fb0',
+    fog: '#3f7a6a',
+    sky: ['#1b1040', '#45256b', '#a1427a', '#e87a4e', '#f7c46b'],
     hazard: 'spike',
   },
   {
     name: 'The Packet Mines',
     rockD: '#241b2c', rock: '#3f3350', rockL: '#5d4d72',
     capD: '#12506e', cap: '#2fa5d6', capL: '#8ce8ff',
-    backD: '#120d18', back: '#1c1524',
+    backD: '#150f1f', back: '#221a33',
     accent: C.cyanL,
-    sky: ['#05060f', '#0d1022', '#161a38', '#232a52'],
+    accent2: '#9dff5c',
+    fog: '#2f6f9e',
+    sky: ['#04060f', '#0d1a3a', '#1c3a6e', '#2f76a8', '#63d2e8'],
     hazard: 'lava',
   },
   {
     name: 'The Firewall Keep',
     rockD: '#2b1a18', rock: '#4d2f2a', rockL: '#7a4d3f',
     capD: '#7a2410', cap: '#c2452e', capL: '#ef7420',
-    backD: '#1a0f0e', back: '#281817',
+    backD: '#1f1113', back: '#33191c',
     accent: C.emberL,
-    sky: ['#170710', '#3a0f18', '#6b1d18', '#a83a16'],
+    accent2: '#5cd8ff',
+    fog: '#b8471f',
+    sky: ['#1b0620', '#5c1030', '#a82a2a', '#e8681f', '#ffc247'],
     hazard: 'lava',
   },
   {
     name: 'The Root Daemon',
     rockD: '#181a24', rock: '#2e3346', rockL: '#4a5270',
     capD: '#5c1a6e', cap: '#a02fc6', capL: '#e07af0',
-    backD: '#0a0a12', back: '#14141f',
+    backD: '#0e0a18', back: '#1b1430',
     accent: C.magenta,
-    sky: ['#04040a', '#0c0818', '#1c0e2e', '#3a1250'],
+    accent2: '#4dffc4',
+    fog: '#7a2ea8',
+    sky: ['#05030d', '#1a0a33', '#3d1263', '#7a1f8c', '#c24da8'],
     hazard: 'lava',
   },
 ];
@@ -91,29 +102,61 @@ function solidTile(theme, mask, seed) {
   const up = mask & MASK.UP, right = mask & MASK.RIGHT;
   const down = mask & MASK.DOWN, left = mask & MASK.LEFT;
 
-  // Rock body with a little dithered noise so large masses are not flat.
+  // Rock body: strata, noise and a few blocks. Large floors are mostly this
+  // tile repeated, so without internal structure the ground reads as one flat
+  // slab of colour.
   g.rect(0, 0, TS, TS, theme.rock);
+  const strataA = mix(theme.rock, theme.rockD, 0.45);
+  const strataB = mix(theme.rock, theme.rockL, 0.4);
   for (let y = 0; y < TS; y++) {
+    // Gently waving bands give the mass a geological grain.
+    const band = Math.sin(y * 0.9 + seed) > 0.35;
     for (let x = 0; x < TS; x++) {
       const n = r();
-      if (n < 0.14) g.set(x, y, theme.rockD);
-      else if (n < 0.26) g.set(x, y, theme.rockL);
+      if (band && n < 0.5) g.set(x, y, strataA);
+      else if (n < 0.13) g.set(x, y, theme.rockD);
+      else if (n < 0.24) g.set(x, y, theme.rockL);
+      else if (n < 0.33) g.set(x, y, strataB);
     }
   }
-  // A couple of larger cracks / blocks.
-  const bx = 2 + Math.floor(r() * 8), by = 5 + Math.floor(r() * 8);
-  g.rect(bx, by, 2 + Math.floor(r() * 3), 2, theme.rockD);
-  g.rect(bx + 1, by - 1, 2, 1, theme.rockL);
+  // A couple of larger embedded blocks with a lit top edge.
+  for (let b = 0; b < 2; b++) {
+    const bx = 1 + Math.floor(r() * (TS - 6));
+    const by = 6 + Math.floor(r() * (TS - 9));
+    const bw = 3 + Math.floor(r() * 3);
+    g.rect(bx, by, bw, 3, theme.rockD);
+    g.rect(bx, by, bw, 1, theme.rockL);
+    g.rect(bx, by + 3, bw, 1, darken(theme.rockD, 0.3));
+  }
+
+  // Mineral flecks in the theme's secondary hue. Sparse on purpose: a few
+  // saturated pixels per tile lift a grey mass without turning the floor
+  // into something that competes with the goblin for attention.
+  const veins = r() < 0.55 ? 1 + Math.floor(r() * 2) : 0;
+  for (let v = 0; v < veins; v++) {
+    const vx = 2 + Math.floor(r() * (TS - 4));
+    const vy = 6 + Math.floor(r() * (TS - 8));
+    g.set(vx, vy, theme.accent2);
+    g.set(vx + 1, vy, darken(theme.accent2, 0.35));
+    if (r() < 0.5) g.set(vx, vy + 1, darken(theme.accent2, 0.5));
+  }
 
   // Open faces get a lit edge, closed faces stay dark so masses read as solid.
   if (up) {
-    g.rect(0, 0, TS, 4, theme.cap);
-    g.rect(0, 0, TS, 1, theme.capL);
-    g.rect(0, 4, TS, 1, theme.capD);
-    // ragged underside of the cap
+    // Dithered bands rather than flat stripes. A solid row of the brightest
+    // colour running unbroken across the level reads as a neon strip laid on
+    // the floor; letting the tones interleave and vary per tile makes the
+    // same edge read as light falling on rock.
+    g.rect(0, 0, TS, 5, theme.cap);
+    g.dither(0, 0, TS, 1, theme.cap, theme.capL, 0.72);
+    g.dither(0, 1, TS, 1, theme.cap, theme.capL, 0.3);
+    g.dither(0, 3, TS, 1, theme.cap, theme.capD, 0.45);
+    g.dither(0, 4, TS, 1, theme.capD, theme.cap, 0.25);
+    // ragged underside of the cap, chewing down into the rock
     for (let x = 0; x < TS; x++) {
       const d = Math.floor(r() * 3);
       g.rect(x, 5, 1, d, theme.capD);
+      if (r() < 0.3) g.set(x, 5 + d, mix(theme.capD, theme.rock, 0.5));
     }
   }
   if (down) {
@@ -132,7 +175,7 @@ function solidTile(theme, mask, seed) {
   }
   // Hard outline on every open face keeps the 16-bit look crisp.
   const ink = darken(theme.rockD, 0.55);
-  if (up) g.rect(0, 0, TS, 1, theme.capL);
+  if (up) g.dither(0, 0, TS, 1, theme.cap, theme.capL, 0.72);
   if (down) g.rect(0, TS - 1, TS, 1, ink);
   if (left) g.rect(0, 0, 1, TS, ink);
   if (right) g.rect(TS - 1, 0, 1, TS, ink);
@@ -144,10 +187,14 @@ function platformTile(theme, seed) {
   const g = new Grid(TS, TS);
   const r = rng(seed * 22695477 + 13);
   g.rect(0, 0, TS, 6, theme.rock);
-  g.rect(0, 0, TS, 1, theme.capL);
-  g.rect(0, 1, TS, 1, theme.cap);
+  // Same dithered lit edge as the ground, so a ledge does not read as a
+  // painted bar floating in mid-air.
+  g.dither(0, 0, TS, 1, theme.cap, theme.capL, 0.6);
+  g.dither(0, 1, TS, 1, theme.rock, theme.cap, 0.75);
+  g.dither(0, 2, TS, 1, theme.rock, theme.capD, 0.4);
   g.rect(0, 5, TS, 1, darken(theme.rockD, 0.4));
   for (let x = 0; x < TS; x++) if (r() < 0.3) g.set(x, 3, theme.rockD);
+  if (r() < 0.4) g.set(2 + Math.floor(r() * (TS - 4)), 3, theme.accent2);
   // end caps hint at a carved ledge
   g.rect(0, 2, 1, 3, theme.rockD);
   g.rect(TS - 1, 2, 1, 3, theme.rockD);
@@ -208,6 +255,14 @@ function backTile(theme, seed) {
     for (let x = off; x < TS + off; x += 8) g.rect(x % TS, y, 1, 8, theme.backD);
   }
   for (let i = 0; i < 6; i++) g.set(Math.floor(r() * TS), Math.floor(r() * TS), theme.backD);
+  // An occasional glowing mosaic chip, so back walls are not a flat slab.
+  if (r() < 0.45) {
+    const mx = 2 + Math.floor(r() * (TS - 4));
+    const my = 2 + Math.floor(r() * (TS - 4));
+    const chip = r() < 0.5 ? theme.accent : theme.accent2;
+    g.rect(mx, my, 2, 2, darken(chip, 0.55));
+    g.set(mx, my, darken(chip, 0.3));
+  }
   return bake(g);
 }
 
@@ -251,14 +306,17 @@ function vineTile(theme) {
 
 function skyCanvas(theme, w, h) {
   const g = new Grid(w, h);
-  const [a, b, c, d] = theme.sky;
-  // Contiguous bands: each starts exactly where the previous one ended, or a
-  // row is left unpainted and shows up as a dark line across the backdrop.
-  const b1 = Math.floor(h * 0.45);
-  const b2 = Math.floor(h * 0.75);
-  g.gradient(0, 0, w, b1, a, b, 6);
-  g.gradient(0, b1, w, b2 - b1, b, c, 5);
-  g.gradient(0, b2, w, h - b2, c, d, 4);
+  const stops = theme.sky;
+  // Walk the stops as contiguous bands. Each band starts exactly where the
+  // previous one ended, or a row is left unpainted and draws as a dark seam
+  // across the whole backdrop.
+  const bands = stops.length - 1;
+  let y0 = 0;
+  for (let i = 0; i < bands; i++) {
+    const y1 = Math.round(((i + 1) / bands) * h);
+    g.gradient(0, y0, w, y1 - y0, stops[i], stops[i + 1], 6);
+    y0 = y1;
+  }
   return bake(g);
 }
 
@@ -297,7 +355,7 @@ function starLayer(theme, w, h, seed) {
 function midLayer(theme, w, h, seed) {
   const g = new WrapGrid(w, h);
   const r = rng(seed);
-  const col = mix(theme.sky[3], theme.rockD, 0.6);
+  const col = mix(theme.sky[theme.sky.length - 1], theme.rockD, 0.62);
   const colL = lighten(col, 0.12);
 
   if (theme.name.includes('Ruins')) {
@@ -332,9 +390,49 @@ function midLayer(theme, w, h, seed) {
       for (let m = 0; m < bw; m += 6) g.rect(x + m, h - bh - 4, 4, 4, col);
       for (let wy = h - bh + 8; wy < h - 6; wy += 10) {
         for (let wx = x + 4; wx < x + bw - 4; wx += 8) {
-          if (r() < 0.55) g.rect(wx, wy, 3, 4, theme.accent);
+          if (r() < 0.55) {
+            // Lit windows alternate between the two theme hues so a distant
+            // wall reads as inhabited rather than as a row of identical dots.
+            const lit = r() < 0.35 ? theme.accent2 : theme.accent;
+            g.rect(wx, wy, 3, 4, darken(lit, 0.25));
+            g.rect(wx, wy, 3, 1, lit);
+          }
         }
       }
+    }
+  }
+  return bake(g);
+}
+
+/**
+ * A soft band of coloured haze sitting between the distant and mid layers.
+ * Cheap atmospheric perspective: it tints the horizon, separates the parallax
+ * planes and is most of what stops the backdrops looking monochrome.
+ */
+function fogLayer(theme, w, h, seed) {
+  const g = new WrapGrid(w, h);
+  const r = rng(seed);
+  const top = Math.floor(h * 0.34);
+  const base = theme.fog;
+  for (let y = top; y < h; y++) {
+    const k = (y - top) / (h - top);
+    // Densest in the middle of the band, fading out top and bottom. Kept
+    // light: this is atmosphere behind the level, not a filter over it.
+    const density = Math.sin(Math.min(1, k * 1.15) * Math.PI) * 0.26;
+    if (density <= 0.02) continue;
+    const band = mix(base, lighten(base, 0.35), k);
+    for (let x = 0; x < w; x++) {
+      const wob = Math.sin(x * 0.035 + y * 0.09) * 0.12;
+      g.dither(x, y, 1, 1, null, band, Math.max(0, density + wob));
+    }
+  }
+  // A few brighter wisps drifting through it.
+  for (let i = 0; i < 16; i++) {
+    const wx = Math.floor(r() * w);
+    const wy = top + Math.floor(r() * (h - top) * 0.8);
+    const len = 10 + Math.floor(r() * 26);
+    for (let d = 0; d < len; d++) {
+      if (r() < 0.45) g.set(wx + d, wy + Math.round(Math.sin(d * 0.2) * 1.5), lighten(base, 0.45));
     }
   }
   return bake(g);
@@ -394,8 +492,16 @@ function nearLayer(theme, w, h, seed) {
 
 export function buildTiles(viewW, viewH) {
   return THEMES.map((theme, ti) => {
+    // Two variants per autotile mask. A long flat floor is one mask repeated
+    // for the whole level, so a single tile per mask turns the ground into a
+    // visibly stamped pattern; alternating two breaks the repeat up.
     const solid = [];
-    for (let mask = 0; mask < 16; mask++) solid.push(solidTile(theme, mask, ti + 1));
+    for (let mask = 0; mask < 16; mask++) {
+      solid.push([
+        solidTile(theme, mask, ti + 1),
+        solidTile(theme, mask, (ti + 1) * 31 + 17),
+      ]);
+    }
     const lava = [];
     const lavaTop = [];
     for (let f = 0; f < 4; f++) {
@@ -405,7 +511,7 @@ export function buildTiles(viewW, viewH) {
     return {
       theme,
       solid,
-      platform: platformTile(theme, ti + 1),
+      platform: [platformTile(theme, ti + 1), platformTile(theme, (ti + 1) * 13 + 5)],
       spike: spikeTile(theme),
       lava,
       lavaTop,
@@ -415,6 +521,7 @@ export function buildTiles(viewW, viewH) {
       sky: skyCanvas(theme, viewW, viewH),
       layers: [
         { img: starLayer(theme, viewW, viewH, 1000 + ti), speed: 0.08, y: 0 },
+        { img: fogLayer(theme, viewW, viewH, 1500 + ti), speed: 0.14, y: 0 },
         { img: midLayer(theme, viewW, viewH, 2000 + ti), speed: 0.22, y: 0 },
         { img: nearLayer(theme, viewW, viewH, 3000 + ti), speed: 0.45, y: 0 },
       ],

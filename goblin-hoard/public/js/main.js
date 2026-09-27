@@ -148,7 +148,7 @@ class Game {
   resetRun() {
     this.score = 0;
     this.loot = 0;
-    this.lives = 3;
+    this.lives = 8;
     this.combo = 0;
     this.comboT = 0;
     this.newBest = false;
@@ -468,23 +468,35 @@ class Game {
 
     const shakeX = Math.round(this.fx.shakeX);
     const shakeY = Math.round(this.fx.shakeY);
-    const cam = { x: Math.round(this.cam.x) + shakeX, y: Math.round(this.cam.y) + shakeY };
+    // Two cameras on purpose.
+    //
+    // `camI` is whole-pixel and draws the tile grid, so tiles stay crisp.
+    // `camF` keeps the fractional part and draws everything that moves.
+    // Entities round `position - camF`, i.e. the offset itself, so a sprite
+    // holding still relative to the camera lands on the same pixel every
+    // frame. Rounding the camera and the sprite separately makes two
+    // independent staircases that drift in and out of phase, and the sprite
+    // visibly stutters backwards while running forwards.
+    const camI = { x: Math.round(this.cam.x) + shakeX, y: Math.round(this.cam.y) + shakeY };
+    const camF = { x: this.cam.x + shakeX, y: this.cam.y + shakeY };
 
-    this.level.drawBackground(ctx, cam, this.tileset, VIEW_W, VIEW_H);
-    this.level.draw(ctx, cam, this.tileset, this.time, VIEW_W, VIEW_H);
+    this.level.drawBackground(ctx, camI, this.tileset, VIEW_W, VIEW_H);
+    this.level.draw(ctx, camI, this.tileset, this.time, VIEW_W, VIEW_H);
 
     // Props and pickups, then enemies, then shots, so nothing important hides.
-    this.drawLayer(ctx, cam, (e) => e instanceof Door || e instanceof Chest);
-    this.drawLayer(ctx, cam, (e) => e instanceof Pickup);
-    this.drawLayer(ctx, cam, (e) => e.isEnemy);
-    if (this.player) this.player.draw(ctx, cam);
-    this.drawLayer(ctx, cam, (e) => !e.isEnemy && !(e instanceof Pickup) && !(e instanceof Door) && !(e instanceof Chest));
+    this.drawLayer(ctx, camF, (e) => e instanceof Door || e instanceof Chest);
+    this.drawLayer(ctx, camF, (e) => e instanceof Pickup);
+    this.drawLayer(ctx, camF, (e) => e.isEnemy);
+    if (this.player) this.player.draw(ctx, camF);
+    this.drawLayer(ctx, camF, (e) => !e.isEnemy && !(e instanceof Pickup) && !(e instanceof Door) && !(e instanceof Chest));
 
+    // Particles are single pixels, so they use the whole-pixel camera or the
+    // canvas would anti-alias them into smudges.
     ctx.save();
-    ctx.translate(-cam.x, -cam.y);
+    ctx.translate(-camI.x, -camI.y);
     this.fx.draw(ctx);
     ctx.restore();
-    this.fx.drawText(ctx, cam.x, cam.y);
+    this.fx.drawText(ctx, camI.x, camI.y);
 
     this.fx.drawFlash(ctx, VIEW_W, VIEW_H);
     this.hud.draw(ctx, this);
@@ -514,9 +526,12 @@ class Game {
     }
     // a ledge along the bottom for the goblin to stand on
     for (let x = 0; x < VIEW_W; x += 16) {
-      ctx.drawImage(ts.solid[1], x, VIEW_H - 32);
-      ctx.drawImage(ts.solid[0], x, VIEW_H - 16);
+      const v = (x / 16) % 2;
+      ctx.drawImage(ts.solid[1][v], x, VIEW_H - 32);   // mask 1 = open top
+      ctx.drawImage(ts.solid[0][v], x, VIEW_H - 16);   // mask 0 = fully buried
     }
+    // Scrim first, then the goblin, so the character stays in front of it.
+    this.hud.titleScrim(ctx);
     this.hud.titleGoblin(ctx, this);
     // a coin the goblin is clearly thinking about
     const coin = this.art.coin;
