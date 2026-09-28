@@ -36,9 +36,18 @@ export class Input {
     this.prev = blank();
     this.usedTouch = false;
     this.onMute = null;
+    // Edge-triggered focus tracking. Checked once per frame in poll().
+    this.hadFocus = typeof document !== 'undefined' && document.hasFocus();
 
     window.addEventListener('keydown', (e) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        // A browser shortcut is starting (Cmd+L, Ctrl+T, Alt+Tab...). Focus is
+        // usually about to leave the page, and the matching keyup for anything
+        // already held will be delivered somewhere else. Let go of everything
+        // now, or the goblin keeps running at a wall forever.
+        this.releaseAll();
+        return;
+      }
       const a = KEYMAP[e.code];
       if (a) {
         if (!e.repeat) this.keys[a] = true;
@@ -53,6 +62,7 @@ export class Input {
     }, { passive: false });
 
     window.addEventListener('blur', () => this.releaseAll());
+    window.addEventListener('pagehide', () => this.releaseAll());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.releaseAll();
     });
@@ -98,6 +108,18 @@ export class Input {
   }
 
   poll() {
+    // The backstop for stuck keys. `blur` is not fired reliably for every way
+    // focus can leave the page (browser chrome, devtools, another window), and
+    // `visibilitychange` only fires when the tab is actually hidden. If the
+    // document does not have focus then the player cannot be pressing anything
+    // into it, so anything still held is stale.
+    //
+    // Edge-triggered rather than continuous: clearing every frame while
+    // unfocused would also stomp input that tests and tooling inject directly.
+    const focused = document.hasFocus();
+    if (this.hadFocus && !focused) this.releaseAll();
+    this.hadFocus = focused;
+
     for (const a of ACTIONS) this.pad[a] = false;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const p of pads) {
