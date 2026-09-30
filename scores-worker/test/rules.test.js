@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { cleanName, isRude } from '../src/names.js';
-import { isoWeek, previousWeek } from '../src/weeks.js';
 import { issueRun, checkRun } from '../src/runs.js';
 import { GAMES } from '../src/games.js';
 
@@ -39,23 +38,6 @@ test('isRude leaves innocent names alone', () => {
     'SWANK', 'TORPEDO', 'ESSEX', 'KNIGHT', 'NIGEL', 'COCKATOO', 'MEL', 'GOBLIN KIN', 'XX_SNIPER']) {
     assert.equal(isRude(n), false, `${n} should be allowed`);
   }
-});
-
-test('isoWeek follows the ISO calendar across year ends', () => {
-  const at = (s) => isoWeek(Date.parse(s)).id;
-  assert.equal(at('2026-09-29T19:00:00Z'), '2026-W40');
-  assert.equal(at('2026-09-28T00:00:00Z'), '2026-W40');           // Monday midnight starts a week
-  assert.equal(at('2026-09-27T23:59:59Z'), '2026-W39');
-  assert.equal(at('2021-01-01T12:00:00Z'), '2020-W53');
-  assert.equal(at('2024-12-30T12:00:00Z'), '2025-W01');
-  assert.equal(at('2026-01-01T12:00:00Z'), '2026-W01');
-  assert.equal(at('2027-01-01T12:00:00Z'), '2026-W53');
-
-  const w = isoWeek(Date.parse('2026-09-29T19:00:00Z'));
-  assert.equal(new Date(w.start).toISOString(), '2026-09-28T00:00:00.000Z');
-  assert.equal(new Date(w.end).toISOString(), '2026-10-05T00:00:00.000Z');
-  assert.equal(previousWeek(w).id, '2026-W39');
-  assert.equal(previousWeek(isoWeek(Date.parse('2026-01-01T00:00:00Z'))).id, '2025-W52');
 });
 
 test('run tokens round-trip, and refuse tampering, other games and old age', async () => {

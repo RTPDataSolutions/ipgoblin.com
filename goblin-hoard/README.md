@@ -51,21 +51,23 @@ Your own best is kept in `localStorage`.
 
 ## High scores
 
-Every run that scores can go on the world tables at
-[scores.ipgoblin.com](https://scores.ipgoblin.com): one wiped every Monday, one all time, one line
-per player. The tables themselves are kept by the `scores-worker/` Worker; the repository README's
-*High scores* section covers the service, its API and how scores are checked.
+Every run that scores can go for a place on the world table at
+[scores.ipgoblin.com](https://scores.ipgoblin.com): the top ten, one line per player, never reset.
+A name stays up until better runs push it off the bottom. The table is kept by the
+`scores-worker/` Worker; the repository README's *High scores* section covers the service, its API
+and how scores are checked.
 
 In the game:
 
 - **The title screen** alternates with the *Hall of Hoarders*, the way an arcade cabinet's attract
-  loop does, and ← / → flip it by hand.
-- **When a run ends** with points, a form over the canvas offers to carve a name into the tables.
+  loop does, and ← / → flip it by hand. It says the score to beat to get on, or, if you are on it,
+  where you stand.
+- **When a run ends** with points, a form over the canvas offers to carve a name into the table.
   It remembers your name, so after the first time posting is a single Enter; the first time it
   suggests a goblin name you can accept or type over. Esc skips. On a gamepad, A posts and Start
   skips.
-- **After posting**, a ranks screen shows where the run landed on both tables, with your line lit
-  up even when it is far below the top ten.
+- **After posting**, a ranks screen shows your place with your line lit up, or, if the run missed
+  the table, the score to beat.
 
 The form is real HTML rather than text drawn on the canvas, so phones get their keyboard and screen
 readers get a label. While it has focus, `js/input.js` leaves keys to it, so typing a name never

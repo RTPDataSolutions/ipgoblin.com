@@ -57,7 +57,7 @@ edge and are not billed as Worker invocations.
 | `site/styles.css` | Goblin-green theme, responsive layout |
 | `site/app.js` | Client-side IP + geo lookup, flags, taunts, copy buttons |
 | `site/speedtest.js` | The speed test, see [The speed test](#the-speed-test) |
-| `site/arcade.js` | Puts each game's leader for the week on its arcade card, see [High scores](#high-scores) |
+| `site/arcade.js` | Puts each game's current leader on its arcade card, see [High scores](#high-scores) |
 | `site/CNAME` | Custom domain (`ipgoblin.com`) |
 | `site/assets/` | Goblin GIFs and favicons |
 
@@ -348,40 +348,42 @@ the DNS record in the Cloudflare zone, exactly as the other Workers do.
 
 `scores-worker/` is the `ipgoblin-scores` Worker behind
 [scores.ipgoblin.com](https://scores.ipgoblin.com): one high score service for both games, backed by
-a D1 database called `ipgoblin-scores`. Every game has two tables:
+a D1 database called `ipgoblin-scores`.
 
-- **This week**, wiped every Monday at 00:00 UTC. Weeks are ISO weeks (`2026-W40`). This is the
-  table anybody can realistically top, which is the reason to come back, and last week's winner is
-  kept and shown as the champion.
-- **All time.**
+Every game has **one table: the top ten, never reset.** A name stays on it until better runs push it
+off the bottom, and to get on you have to beat the tenth place's score, not just match it, because
+ties go to whoever got there first.
 
-Each table holds **one line per player**: their best run on it. A player is not an account, just a
-random id the browser makes up and keeps in `localStorage`, so the same person on another device is
-a second line. Names are up to ten characters of `A-Z 0-9 . _ ! ? -`, which is what GOBLIN HOARD's
-bitmap font can draw, and a player's latest name shows on all of their lines.
+The table has **one line per player**: their best run. A player is not an account, just a random id
+the browser makes up and keeps in `localStorage`, so the same person on another device is a second
+player. Names are up to ten characters of `A-Z 0-9 . _ ! ? -`, which is what GOBLIN HOARD's bitmap
+font can draw, and a player's line always shows the name they used last.
 
 Where people see it:
 
-- **In the games.** The title screen alternates with the tables, arcade attract-loop style, and left
-  and right flip it by hand. When a run ends with points, a form offers to carve a name into the
-  table. It remembers the name, so after the first time posting is a single Enter, and a first-timer
-  is offered a random goblin name to accept or type over. Escape skips. Then a ranks screen shows
-  where the run landed on both tables with the player's own line lit up, even when that line is far
-  below the top ten.
-- **On ipgoblin.com.** Each arcade card shows the game's leader for the week (`site/arcade.js`).
-- **At [scores.ipgoblin.com](https://scores.ipgoblin.com).** Every table as a plain web page.
+- **In the games.** The title screen alternates with the table, arcade attract-loop style, and left
+  and right flip it by hand. The table says what it takes to get on ("BEAT 0012345 TO GET ON THE
+  TABLE"), or, for a player already on it, "YOU ARE #3 - DON'T GET KNOCKED OFF". When a run ends
+  with points, a form offers to carve a name into the table. It remembers the name, so after the
+  first time posting is a single Enter, and a first-timer is offered a random goblin name to accept
+  or type over. Escape skips. Then a ranks screen shows where the run landed with the player's own
+  line lit up, or, if it missed, the score to beat.
+- **On ipgoblin.com.** Each arcade card shows the game's current leader (`site/arcade.js`).
+- **At [scores.ipgoblin.com](https://scores.ipgoblin.com).** Both tables as a plain web page.
 
 #### API
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/` | GET | Every table as a web page. `?format=json` for the data. |
-| `/v1/boards` | GET | Every table as JSON. `?limit=1-10`, default 3. |
-| `/v1/<game>/leaderboard` | GET | One game's tables. `?limit=1-25` (default 10); `?player=<id>` adds that player's rank. |
+| `/` | GET | Both tables as a web page. `?format=json` for the data. |
+| `/v1/boards` | GET | Both tables as JSON. `?limit=1-10`, default 3. |
+| `/v1/<game>/leaderboard` | GET | One game's table. `?limit=1-10` (default 10); `?player=<id>` marks that player's line with `you`. |
 | `/v1/<game>/runs` | POST | Starts a run and returns its run token. Only from the game's own origin. |
 | `/v1/<game>/scores` | POST | `{ run, player, name, score, level, won }`. Only from the game's own origin. |
 
-`<game>` is `goblin-hoard` or `ghoul-time`. Reads are open to anyone, with CORS `*`.
+`<game>` is `goblin-hoard` or `ghoul-time`. Reads are open to anyone, with CORS `*`. A table comes
+back as `{ size, top, cutoff }`, where `cutoff` is the score a run has to beat to get on: the tenth
+place's, or 0 while there are empty places.
 
 ```sh
 curl -s https://scores.ipgoblin.com/v1/boards | jq .
@@ -424,15 +426,15 @@ npx wrangler d1 execute ipgoblin-scores --remote --command \
   "UPDATE bests SET hidden = 1 WHERE player = '<player id>'"
 ```
 
-Hiding sticks: any line a hidden player reaches later, such as next week's, is hidden too. Set
-`hidden` back to `0` to undo it. `runs` keeps every accepted score, so a table can always be
-rebuilt from it.
+Hiding sticks, because a posted score never changes a player's `hidden` flag. Set it back to `0` to
+undo it. `runs` keeps every accepted score, so a table can always be rebuilt from it.
 
 #### Privacy and budget
 
 The scoreboard keeps the name, score, level reached, when, and the random player id. No IP
 addresses, no cookies, no accounts, and both the name form and the arcade section on ipgoblin.com
-say so.
+say so. A player who rolls off the table keeps their row in `bests`, out of sight, because that is
+how a later run knows whether it beat their best.
 
 Every request is a Worker invocation, so it counts against the account-wide 100,000 a day. D1's free
 plan allows 5 million rows read and 100,000 written a day: a table read walks an index and reads

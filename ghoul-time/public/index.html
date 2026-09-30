@@ -536,10 +536,6 @@ function stored(k,v){
   try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v); }catch(e){}
   return null;
 }
-function wipesIn(s){
-  const d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60);
-  return d>0 ? d+'D '+h+'H' : h>0 ? h+'H '+m+'M' : Math.max(1,m)+'M';
-}
 
 const SB={
   base: (location.hostname==='localhost'||location.hostname==='127.0.0.1')
@@ -555,10 +551,9 @@ const SB={
     return p;
   })(),
   name: cleanName(stored('ghoultime_name')||''),
-  boards:null, at:0, loading:null, tried:-1e9, run:null, runReq:null,
+  table:null, at:0, loading:null, tried:-1e9, run:null, runReq:null,
 
-  get age(){ return this.boards ? (performance.now()-this.at)/1000 : Infinity; },
-  get resetIn(){ return this.boards ? Math.max(0,this.boards.week.endsIn-this.age) : 0; },
+  get age(){ return this.table ? (performance.now()-this.at)/1000 : Infinity; },
 
   async req(path,body){
     const ctrl=new AbortController(), timer=setTimeout(()=>ctrl.abort(),8000);
@@ -572,7 +567,7 @@ const SB={
     if(!res.ok){ const err=new Error((data&&data.error)||'The scoreboard said '+res.status+'.'); err.status=res.status; throw err; }
     return data;
   },
-  accept(d){ this.boards=d; this.at=performance.now(); },
+  accept(d){ this.table=d; this.at=performance.now(); },
   // Never throws. At most one try every ten seconds unless forced, so a
   // scoreboard that is down is not asked again every frame.
   refresh(force){
@@ -598,7 +593,7 @@ const SB={
       // 409: this run already went up, e.g. an earlier answer never arrived.
       if(err.status!==409) throw err;
       this.run=null; await this.refresh(true);
-      return Object.assign({posted:null},this.boards);
+      return Object.assign({posted:null},this.table);
     }
     this.run=null;
     this.name=d.posted.name; stored('ghoultime_name',this.name);
@@ -667,8 +662,7 @@ async function entryPost(){
   try{ G.posted=await SB.submit({name:name,score:G.score,level:G.level}); }
   catch(err){ G.post='entry'; EN.setBusy(false); EN.say(String(err.message||err).toUpperCase(),true); return; }
   EN.hide(); G.post='none'; G.state='ranks'; G.endT=0;
-  const imp=G.posted.posted&&G.posted.posted.improved;
-  if(imp&&(imp.week||imp.all)) SFX.clear(); else SFX.bonus();
+  if(G.posted.posted&&G.posted.posted.improved) SFX.clear(); else SFX.bonus();
 }
 function entrySkip(){ if(EN.busy) return; EN.hide(); G.post='skipped'; }
 const canReplay=()=>G.post==='none'||G.post==='offline'||G.post==='skipped';
@@ -680,12 +674,12 @@ function gameOverContinue(){
 
 // The title alternates with the tables, the way an arcade cabinet's attract
 // loop does. Left and right flip it by hand.
-function flipPage(d){ const n=SB.boards?2:1; G.page=(G.page+d+n)%n; G.pageT=0; }
+function flipPage(d){ const n=SB.table?2:1; G.page=(G.page+d+n)%n; G.pageT=0; }
 function updateTitlePages(dt){
   G.pageT+=dt;
   if(G.pageT>(G.page===0?9:8)) flipPage(1);
-  // Pick up other players' scores, and the new week once this one is wiped.
-  if(G.page===1&&(SB.age>90||SB.resetIn<=0)) SB.refresh();
+  // Pick up other players' scores while the table is on show.
+  if(G.page===1&&SB.age>90) SB.refresh();
 }
 
 /* ============================== DRAW HELPERS ============================== */
@@ -941,7 +935,7 @@ function panel(y,h){ ctx.globalAlpha=0.82; px(18,y,GW-36,h,'#120a22'); ctx.globa
 function drawTitle(){
   const cxm=GW/2;
   panel(64,190);
-  if(G.page===1&&SB.boards) drawTitleScores();
+  if(G.page===1&&SB.table) drawTitleScores();
   else {
     text('GHOUL TIME',cxm,78,'#7cf03a',20,'center');
     text('S L I M E   C H E F',cxm,102,'#ff8ae2',9,'center');
@@ -953,7 +947,7 @@ function drawTitle(){
     text('Drop slabs on ghouls for big points!',cxm,200,'#9ad8ff',8,'center');
   }
   if(Math.floor(G.t*2)%2===0) text(isTouch?'TAP TO START':'PRESS SPACE TO START',cxm,224,'#ffffff',10,'center');
-  if(SB.boards) text('<  >  HIGH SCORES',cxm,332,'#8a7ab5',8,'center');
+  if(SB.table) text('<  >  HIGH SCORES',cxm,332,'#8a7ab5',8,'center');
   // mascots
   drawFoe({kind:'ghost',x:52,y:246,anim:G.t*4,dead:0,stun:0,wob:G.t*4,dir:1});
   drawFoe({kind:'goblin',x:GW/2,y:250,anim:G.t*5,dead:0,stun:0,wob:0,dir:1});
@@ -962,55 +956,57 @@ function drawTitle(){
 }
 
 /* ---------- high score tables ---------- */
-function drawTitleScores(){
-  const cxm=GW/2, b=SB.boards;
-  text('HIGH SCORES',cxm,70,'#7cf03a',16,'center');
-  let sub='NEXT WEEKLY WIPE IN '+wipesIn(SB.resetIn);
-  if(b.champion) sub+='  \u00b7  LAST WEEK: '+b.champion.name;
-  text(sub,cxm,90,'#ff8ae2',8,'center');
-  drawBoards(102,b);
+// What it takes to get on the table.
+function toGetOn(t){
+  if(t.cutoff>0) return 'BEAT '+String(t.cutoff).padStart(6,'0')+' TO GET ON THE TABLE';
+  const open=t.size-t.top.length;
+  return open===t.size ? 'THE TABLE IS EMPTY \u00b7 ANY SCORE GETS ON'
+    : open+(open===1?' PLACE':' PLACES')+' LEFT \u00b7 ANY SCORE GETS ON';
 }
-// After posting: where the run landed, with your line lit up.
+function drawTitleScores(){
+  const cxm=GW/2, t=SB.table, you=t.top.find(e=>e.you);
+  text('HIGH SCORES',cxm,70,'#7cf03a',16,'center');
+  text(you?'YOU ARE #'+you.rank+' \u00b7 DON\u2019T GET KNOCKED OFF':toGetOn(t),cxm,90,'#ff8ae2',8,'center');
+  drawTable(104,t);
+}
+// After posting: where the game landed, with your line lit up.
 function drawRanks(){
-  const cxm=GW/2, r=(G.posted&&G.posted.week)?G.posted:SB.boards;
-  const wk=r&&r.week&&r.week.you, all=r&&r.all&&r.all.you;
+  const cxm=GW/2, t=(G.posted&&G.posted.top)?G.posted:SB.table;
+  const you=t&&t.top.find(e=>e.you);
   panel(44,222);
-  text(wk?'#'+wk.rank+' THIS WEEK':'SCORE POSTED',cxm,52,'#ff8ae2',16,'center');
+  text(you?'#'+you.rank+' ON THE TABLE':(t&&t.cutoff)?'NOT ON THE TABLE':'SCORE POSTED',cxm,52,'#ff8ae2',16,'center');
   const imp=G.posted&&G.posted.posted&&G.posted.posted.improved;
-  const flair=!imp?'':imp.all?'NEW PERSONAL BEST!':imp.week?'NEW BEST THIS WEEK!':'YOUR BEST STILL STANDS';
-  text([all?'#'+all.rank+' ALL TIME':'',flair].filter(Boolean).join('  \u00b7  '),cxm,72,
-    imp&&(imp.all||imp.week)?'#ffe66d':'#cbbde8',9,'center');
-  if(r&&r.week) drawBoards(88,r);
+  const sub=[];
+  if(imp) sub.push('NEW PERSONAL BEST!');
+  else if(you&&G.posted&&G.posted.posted) sub.push('YOUR BEST STILL STANDS');
+  if(!you&&t&&t.cutoff) sub.push('BEAT '+String(t.cutoff).padStart(6,'0')+' TO GET ON');
+  text(sub.join('  \u00b7  '),cxm,72,imp?'#ffe66d':'#cbbde8',9,'center');
+  if(t) drawTable(88,t);
   text('THIS RUN  '+G.score.toLocaleString('en-US')+'  ON LEVEL '+G.level,cxm,210,'#cbbde8',8,'center');
-  text('EVERY BOARD LIVES AT SCORES.IPGOBLIN.COM',cxm,222,'#8a7ab5',8,'center');
+  text('EVERY TABLE LIVES AT SCORES.IPGOBLIN.COM',cxm,222,'#8a7ab5',8,'center');
   if(G.endT>0.8&&Math.floor(G.t*2)%2===0) text(isTouch?'TAP TO PLAY AGAIN':'PRESS SPACE TO PLAY AGAIN',cxm,244,'#ffffff',10,'center');
 }
-// This week on the left, all time on the right.
-function drawBoards(y,b){
-  drawBoardColumn(26,y,'THIS WEEK',b.week);
-  drawBoardColumn(174,y,'ALL TIME',b.all);
-}
-// Ten lines. If you are on the board but below the tenth line, the last two
-// become a gap and your own line, so you always see where you stand.
-function drawBoardColumn(x0,y,label,board){
-  const mid=x0+68;
-  text(label,mid,y,'#ffe66d',9,'center');
-  px(x0,y+11,136,1,'#3b2d55');
-  if(!board.top.length){
-    text('NOBODY YET',mid,y+34,'#cbbde8',9,'center');
-    text('THE TOP SPOT IS UP FOR GRABS',mid,y+48,'#8a7ab5',7,'center');
+// The top ten, one line per player, never reset. A name rolls off the
+// bottom when a better game comes in.
+function drawTable(y,t){
+  text('#',48,y,'#ffe66d',8,'right');
+  text('NAME',56,y,'#ffe66d',8,'left');
+  text('LEVEL',236,y,'#ffe66d',8,'right');
+  text('SCORE',300,y,'#ffe66d',8,'right');
+  px(30,y+10,276,1,'#3b2d55');
+  if(!t.top.length){
+    text('NOBODY YET',GW/2,y+34,'#cbbde8',9,'center');
+    text('THE TOP SPOT IS UP FOR GRABS',GW/2,y+48,'#8a7ab5',8,'center');
     return;
   }
-  let rows=board.top.slice(0,10);
-  if(board.you&&!rows.some(e=>e.you)) rows=rows.slice(0,8).concat([null,Object.assign({},board.you,{you:true})]);
-  rows.forEach((e,i)=>{
-    const ry=y+15+i*10;
-    if(!e){ text('. . .',mid,ry,'#8a7ab5',8,'center'); return; }
-    if(e.you){ ctx.globalAlpha=0.55+0.25*Math.sin(G.t*5); px(x0-2,ry-1,140,10,'#3a2560'); ctx.globalAlpha=1; }
+  t.top.slice(0,10).forEach((e,i)=>{
+    const ry=y+14+i*10;
+    if(e.you){ ctx.globalAlpha=0.55+0.25*Math.sin(G.t*5); px(28,ry-1,280,10,'#3a2560'); ctx.globalAlpha=1; }
     const c=e.you?'#ff8ae2':null;
-    text(String(e.rank),x0+12,ry,c||'#8a7ab5',9,'right');
-    text(e.name,x0+17,ry,c||(e.rank===1?'#ffe66d':'#cbbde8'),9,'left');
-    text(String(e.score).padStart(6,'0'),x0+136,ry,c||'#7cf03a',9,'right');
+    text(String(e.rank),48,ry,c||'#8a7ab5',9,'right');
+    text(e.name,56,ry,c||(e.rank===1?'#ffe66d':'#cbbde8'),9,'left');
+    text('LV '+e.level,236,ry,c||'#8a7ab5',9,'right');
+    text(String(e.score).padStart(6,'0'),300,ry,c||'#7cf03a',9,'right');
   });
 }
 

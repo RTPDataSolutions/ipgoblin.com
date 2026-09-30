@@ -1,11 +1,14 @@
 /**
  * IP Goblin scores: the high score tables for the goblin arcade.
  *
- *   GET  /                          every board, as a web page
- *   GET  /v1/boards                 every board, as JSON (?limit=1-10, default 3)
- *   GET  /v1/:game/leaderboard      one game's boards (?limit=1-25, ?player=<id>)
+ *   GET  /                          every table, as a web page
+ *   GET  /v1/boards                 every table, as JSON (?limit=1-10, default 3)
+ *   GET  /v1/:game/leaderboard      one game's table (?limit=1-10, ?player=<id>)
  *   POST /v1/:game/runs             start a run, get a run token
  *   POST /v1/:game/scores           post a finished run's score
+ *
+ * Each game has one table, the top ten, and it is never reset: a name stays
+ * up until ten better runs push it off.
  *
  * Reads are open to anyone. Writes are only accepted from the game's own
  * origin, need a run token issued when the run started, and have to look like
@@ -15,9 +18,7 @@
 import { GAMES, GAME_IDS } from './games.js';
 import { cleanName, isRude } from './names.js';
 import { issueRun, checkRun } from './runs.js';
-import {
-  boardIds, readStatements, submitStatements, shapeBoards, READS_WITHOUT_PLAYER,
-} from './boards.js';
+import { tableStatement, submitStatements, shapeTable, TABLE_SIZE } from './boards.js';
 import { renderPage } from './page.js';
 
 const READ_CORS = {
@@ -95,29 +96,22 @@ async function readJson(request) {
 
 /* ------------------------------------------------------------------ reads */
 
-async function allBoards(env, limit) {
-  const now = Date.now();
-  const ids = boardIds(now);
-  const stmts = GAME_IDS.flatMap((game) => readStatements(env.DB, game, ids, limit, ''));
-  const results = await env.DB.batch(stmts);
+async function allTables(env, limit) {
+  const results = await env.DB.batch(GAME_IDS.map((game) => tableStatement(env.DB, game, '')));
   const games = {};
   GAME_IDS.forEach((game, i) => {
-    const mine = results.slice(i * READS_WITHOUT_PLAYER, (i + 1) * READS_WITHOUT_PLAYER);
-    games[game] = { title: GAMES[game].title, url: GAMES[game].url, ...shapeBoards(mine, ids, now, '') };
+    games[game] = { title: GAMES[game].title, url: GAMES[game].url, ...shapeTable(results[i], limit) };
   });
-  const week = games[GAME_IDS[0]].week;
-  return { week: { id: week.id, ends: week.ends, endsIn: week.endsIn }, games };
+  return { games };
 }
 
 async function getLeaderboard(request, env, game, url) {
   if (await limited(env.READ_LIMIT, request)) return fail('Slow down, the scribes are busy.', 429, READ_CORS);
-  const now = Date.now();
-  const ids = boardIds(now);
-  const limit = clampInt(url.searchParams.get('limit'), 1, 25, 10);
+  const limit = clampInt(url.searchParams.get('limit'), 1, TABLE_SIZE, TABLE_SIZE);
   const p = url.searchParams.get('player') || '';
   const player = PLAYER_RE.test(p) ? p : '';
-  const results = await env.DB.batch(readStatements(env.DB, game, ids, limit, player));
-  return json({ game, title: GAMES[game].title, ...shapeBoards(results, ids, now, player) }, 200, READ_CORS);
+  const result = await tableStatement(env.DB, game, player).all();
+  return json({ game, title: GAMES[game].title, ...shapeTable(result, limit) }, 200, READ_CORS);
 }
 
 /* ----------------------------------------------------------------- writes */
@@ -158,13 +152,12 @@ async function postScore(request, env, game, cors) {
     return fail('The goblins counted that twice and it does not add up.', 422, cors);
   }
 
-  const ids = boardIds(now);
   const writes = submitStatements(env.DB, {
     game, nonce: run.nonce, player, name, score, level, won, seconds: run.seconds, now,
-  }, ids);
+  });
   let results;
   try {
-    results = await env.DB.batch([...writes, ...readStatements(env.DB, game, ids, 10, player)]);
+    results = await env.DB.batch([...writes, tableStatement(env.DB, game, player)]);
   } catch (err) {
     if (/UNIQUE constraint failed/i.test(String(err?.message))) {
       return fail('That run is already on the wall.', 409, cors);
@@ -172,25 +165,25 @@ async function postScore(request, env, game, cors) {
     throw err;
   }
 
-  const improved = { week: results[1].meta.changes > 0, all: results[2].meta.changes > 0 };
-  const boards = shapeBoards(results.slice(writes.length), ids, now, player);
-  return json({ game, title: def.title, posted: { name, score, level, won, improved }, ...boards }, 200, cors);
+  const improved = results[1].meta.changes > 0;
+  const table = shapeTable(results[writes.length]);
+  return json({ game, title: def.title, posted: { name, score, level, won, improved }, ...table }, 200, cors);
 }
 
 /* ----------------------------------------------------------------- router */
 
 const USAGE = `IP GOBLIN SCORES
 
-  GET  /                        every board, as a web page
-  GET  /v1/boards               every board, as JSON (?limit=1-10, default 3)
-  GET  /v1/<game>/leaderboard   one game's boards (?limit=1-25, default 10)
+  GET  /                        every table, as a web page
+  GET  /v1/boards               every table, as JSON (?limit=1-10, default 3)
+  GET  /v1/<game>/leaderboard   one game's table (?limit=1-10, default 10)
   POST /v1/<game>/runs          start a run (from the game only)
   POST /v1/<game>/scores        post a score (from the game only)
 
 Games: ${GAME_IDS.join(', ')}
 
-Each game has an all-time board and a weekly board that is wiped every
-Monday at 00:00 UTC. One line per player: their best run on that board.
+Each game has one table: the top ${TABLE_SIZE} players, by their best run. It is
+never reset. A name stays up until ${TABLE_SIZE} better runs push it off.
 
 https://ipgoblin.com/#arcade`;
 
@@ -225,14 +218,14 @@ async function route(request, env) {
 
   if (path === '/v1/boards') {
     if (await limited(env.READ_LIMIT, request)) return fail('Slow down, the scribes are busy.', 429, READ_CORS);
-    return json(await allBoards(env, clampInt(url.searchParams.get('limit'), 1, 10, 3)), 200, READ_CORS);
+    return json(await allTables(env, clampInt(url.searchParams.get('limit'), 1, TABLE_SIZE, 3)), 200, READ_CORS);
   }
 
   if (path === '/') {
     if (await limited(env.READ_LIMIT, request)) return text('Slow down, the scribes are busy.', 429);
-    const data = await allBoards(env, 10);
+    const data = await allTables(env, TABLE_SIZE);
     if (url.searchParams.get('format') === 'json') return json(data, 200, READ_CORS);
-    return new Response(renderPage(data.games, data.week), {
+    return new Response(renderPage(data.games), {
       headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
     });
   }

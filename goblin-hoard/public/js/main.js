@@ -352,8 +352,7 @@ class Game {
     this.post = 'none';
     this.state = 'ranks';
     this.endT = 0;
-    const improved = this.posted.posted?.improved;
-    this.sound.sfx(improved && (improved.week || improved.all) ? 'key' : 'select');
+    this.sound.sfx(this.posted.posted?.improved ? 'key' : 'select');
   }
 
   skipEntry() {
@@ -376,7 +375,7 @@ class Game {
    * cabinet's attract loop does. Left and right flip it by hand.
    */
   updateTitlePages(dt) {
-    const pages = this.scores.boards ? 2 : 1;
+    const pages = this.scores.table ? 2 : 1;
     this.titlePageT += dt;
     const flip = this.input.pressed('left') || this.input.pressed('right') ||
       this.titlePageT > TITLE_PAGE_SECONDS[this.titlePage];
@@ -384,8 +383,8 @@ class Game {
       this.titlePage = (this.titlePage + 1) % pages;
       this.titlePageT = 0;
     }
-    // Pick up other players' scores, and the new week once this one is wiped.
-    if (this.titlePage === 1 && (this.scores.age > 90 || this.scores.resetIn <= 0)) this.scores.refresh();
+    // Pick up other players' scores while the table is on show.
+    if (this.titlePage === 1 && this.scores.age > 90) this.scores.refresh();
   }
 
   /* ------------------------------------------------------------ main loop */
@@ -651,7 +650,7 @@ class Game {
       ctx.drawImage(ts.solid[1][v], x, VIEW_H - 32);   // mask 1 = open top
       ctx.drawImage(ts.solid[0][v], x, VIEW_H - 16);   // mask 0 = fully buried
     }
-    if (this.titlePage === 1 && this.scores.boards) {
+    if (this.titlePage === 1 && this.scores.table) {
       this.hud.titleScores(ctx, this);
       this.hud.titleGoblin(ctx, this);
       this.fx.drawFlash(ctx, VIEW_W, VIEW_H);

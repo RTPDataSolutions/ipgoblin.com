@@ -38,17 +38,19 @@ Four ladder layouts rotate across levels. Your own best (the HUD's `HI`) persist
 
 ## High scores
 
-Every game that scores can go on the world tables at
-[scores.ipgoblin.com](https://scores.ipgoblin.com): one wiped every Monday, one all time, one line
-per player. The tables are kept by the `scores-worker/` Worker; the repository README's
-*High scores* section covers the service, its API and how scores are checked.
+Every game that scores can go for a place on the world table at
+[scores.ipgoblin.com](https://scores.ipgoblin.com): the top ten, one line per player, never reset.
+A name stays up until better games push it off the bottom. The table is kept by the
+`scores-worker/` Worker; the repository README's *High scores* section covers the service, its API
+and how scores are checked.
 
-- **The title screen** alternates with the tables, arcade attract-loop style, and ← / → flip it.
+- **The title screen** alternates with the table, arcade attract-loop style, and ← / → flip it. It
+  says the score to beat to get on, or, if you are on it, where you stand.
 - **At game over**, a form offers to sign your name onto the menu. It remembers the name, so after
   the first time posting is a single Enter; the first time it suggests a chef name to accept or type
   over. Esc skips.
-- **After posting**, a panel shows where the game landed on both tables with your line lit up, even
-  far below the top ten. Space plays again.
+- **After posting**, a panel shows your place with your line lit up, or, if the game missed the
+  table, the score to beat. Space plays again.
 
 While the form has focus, the game leaves keys alone, so typing a name never moves the chef. Each
 game asks the scoreboard for a run token when it starts; if the scoreboard cannot be reached the

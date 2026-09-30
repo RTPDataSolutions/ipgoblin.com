@@ -1,6 +1,6 @@
 /**
- * arcade.js - puts each game's leader for the week on its arcade card, from
- * the high score tables at scores.ipgoblin.com.
+ * arcade.js - puts each game's current leader on its arcade card, from the
+ * high score tables at scores.ipgoblin.com.
  *
  * Decoration only: if the scoreboard cannot be reached the lines stay hidden.
  */
@@ -19,14 +19,13 @@
       for (const el of lines) {
         const game = data.games && data.games[el.dataset.leader];
         if (!game) continue;
-        const top = game.week.top[0];
+        const top = game.top[0];
         if (top) {
           const name = document.createElement('strong');
           name.textContent = top.name;
-          el.replaceChildren('This week\u2019s top goblin: ', name,
-            ` with ${Number(top.score).toLocaleString('en-US')}`);
+          el.replaceChildren('Top goblin: ', name, ` with ${Number(top.score).toLocaleString('en-US')}`);
         } else {
-          el.textContent = 'Nobody is on this week\u2019s table yet. The crown is up for grabs.';
+          el.textContent = 'Nobody is on the table yet. The top spot is up for grabs.';
         }
         el.hidden = false;
       }

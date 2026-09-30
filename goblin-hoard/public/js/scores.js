@@ -56,7 +56,7 @@ export class Scoreboard {
       store.set(STORE_PLAYER, this.player);
     }
     this.savedName = cleanName(store.get(STORE_NAME, ''));
-    this.boards = null;
+    this.table = null;
     this.fetchedAt = 0;
     this.loading = null;
     this.triedAt = -Infinity;
@@ -68,14 +68,9 @@ export class Scoreboard {
     return this.savedName || GOBLIN_NAMES[Math.floor(Math.random() * GOBLIN_NAMES.length)];
   }
 
-  /** Seconds since the boards were fetched. */
+  /** Seconds since the table was fetched. */
   get age() {
-    return this.boards ? (performance.now() - this.fetchedAt) / 1000 : Infinity;
-  }
-
-  /** Seconds until this week's board is wiped. */
-  get resetIn() {
-    return this.boards ? Math.max(0, this.boards.week.endsIn - this.age) : 0;
+    return this.table ? (performance.now() - this.fetchedAt) / 1000 : Infinity;
   }
 
   async request(path, body) {
@@ -102,12 +97,12 @@ export class Scoreboard {
   }
 
   accept(data) {
-    this.boards = data;
+    this.table = data;
     this.fetchedAt = performance.now();
   }
 
   /**
-   * Fetch the boards. Never throws; on failure the old boards (if any) stay.
+   * Fetch the table. Never throws; on failure the old table (if any) stays.
    * At most one attempt every ten seconds unless forced, so a scoreboard
    * that is down is not asked again every frame.
    */
@@ -148,7 +143,7 @@ export class Scoreboard {
       if (err.status !== 409) throw err;
       this.run = null;
       await this.refresh(true);
-      return { posted: null, ...this.boards };
+      return { posted: null, ...this.table };
     }
     this.run = null;
     this.savedName = data.posted.name;
@@ -156,14 +151,4 @@ export class Scoreboard {
     this.accept(data);
     return data;
   }
-}
-
-/** "4D 23H", "5H 12M", "9M". */
-export function wipesIn(seconds) {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}D ${h}H`;
-  if (h > 0) return `${h}H ${m}M`;
-  return `${Math.max(1, m)}M`;
 }
