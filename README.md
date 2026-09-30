@@ -24,12 +24,13 @@
 | `speed-worker/` | Cloudflare Worker behind [speed.ipgoblin.com](https://speed.ipgoblin.com), the speed-test backend |
 | `goblin-hoard/` | Cloudflare Worker behind [hoard.ipgoblin.com](https://hoard.ipgoblin.com), a 16-bit platformer. See [The arcade](#the-arcade). |
 | `ghoul-time/` | Cloudflare Worker behind [ghoultime.ipgoblin.com](https://ghoultime.ipgoblin.com), a BurgerTime-style arcade game |
+| `scores-worker/` | Cloudflare Worker behind [scores.ipgoblin.com](https://scores.ipgoblin.com), the arcade's high score tables. See [High scores](#high-scores). |
 | `scripts/` | Publish and reporting helpers |
 | `.github/workflows/pages.yml` | Pages deploy, currently blocked (see [Deploying](#deploying)) |
 | `speedtest/` | An abandoned 2023 speed-test tool with a Node backend. Superseded by `speed-worker/`; see [The speed test](#the-speed-test). |
 | `index.php`, `index2.php`, `index3.php`, `*.zip`, loose images | The original 2023 PHP site, kept for reference. Not deployed. |
 
-Six pieces, deployed independently:
+Seven pieces, deployed independently:
 
 ```
 ipgoblin.com          ->  Cloudflare  ->  GitHub Pages (gh-pages branch)  <- site/
@@ -38,9 +39,10 @@ stats.ipgoblin.com    ->  Cloudflare Worker "ipgoblin-stats"              <- sta
 speed.ipgoblin.com    ->  Cloudflare Worker "ipgoblin-speed"              <- speed-worker/
 hoard.ipgoblin.com    ->  Cloudflare Worker "goblin-hoard"                <- goblin-hoard/
 ghoultime.ipgoblin.com -> Cloudflare Worker "ghoul-time"                  <- ghoul-time/
+scores.ipgoblin.com   ->  Cloudflare Worker "ipgoblin-scores" + D1        <- scores-worker/
 ```
 
-Cloudflare is authoritative for DNS and terminates TLS for all six. The two games are Workers
+Cloudflare is authoritative for DNS and terminates TLS for all seven. The two games are Workers
 **static-asset** sites rather than script Workers, so their requests are served straight off the
 edge and are not billed as Worker invocations.
 
@@ -55,11 +57,12 @@ edge and are not billed as Worker invocations.
 | `site/styles.css` | Goblin-green theme, responsive layout |
 | `site/app.js` | Client-side IP + geo lookup, flags, taunts, copy buttons |
 | `site/speedtest.js` | The speed test, see [The speed test](#the-speed-test) |
+| `site/arcade.js` | Puts each game's current leader on its arcade card, see [High scores](#high-scores) |
 | `site/CNAME` | Custom domain (`ipgoblin.com`) |
 | `site/assets/` | Goblin GIFs and favicons |
 
-The *goblin arcade* section near the bottom of the page links out to the two games; see
-[The arcade](#the-arcade).
+The *goblin arcade* section near the bottom of the page links out to the two games and their high
+score tables; see [The arcade](#the-arcade).
 
 It is fully static — no PHP — so the visitor's IP is resolved in the browser with
 [ipwho.is](https://ipwho.is), falling back to [ipapi.co](https://ipapi.co) and then
@@ -238,7 +241,7 @@ The stream is `pull`-based so a slow client applies backpressure instead of forc
 to buffer the whole response.
 
 Note that the 100,000 requests/day free allowance is **account-wide**, shared with the other
-three Workers. `ipgoblin-speed` is separate so it can be disabled on its own if its bandwidth
+script Workers. `ipgoblin-speed` is separate so it can be disabled on its own if its bandwidth
 ever becomes a problem, not because it has its own quota.
 
 ### How the client measures
@@ -300,8 +303,9 @@ been shown the server's own bandwidth rather than their own. It also carries ~1,
 ## The arcade
 
 Two games, each its own Cloudflare Worker serving **static assets**. Static assets are not billed
-as Worker invocations, so neither one eats into the 100,000 requests/day allowance the other three
-Workers share. The site links to both from the *goblin arcade* section.
+as Worker invocations, so neither one eats into the 100,000 requests/day allowance the script
+Workers share. The site links to both from the *goblin arcade* section. Their high score tables are
+the one part that does run code; see [High scores](#high-scores).
 
 ### goblin-hoard/
 
@@ -339,6 +343,135 @@ npm run deploy
 
 Both declare their hostname as a `custom_domain` route, so `wrangler deploy` creates and maintains
 the DNS record in the Cloudflare zone, exactly as the other Workers do.
+
+### High scores
+
+`scores-worker/` is the `ipgoblin-scores` Worker behind
+[scores.ipgoblin.com](https://scores.ipgoblin.com): one high score service for both games, backed by
+a D1 database called `ipgoblin-scores`.
+
+Every game has **one table: the top ten, never reset.** A name stays on it until better runs push it
+off the bottom, and to get on you have to beat the tenth place's score, not just match it, because
+ties go to whoever got there first.
+
+The table has **one line per player**: their best run. A player is not an account, just a random id
+the browser makes up and keeps in `localStorage`, so the same person on another device is a second
+player. Names are up to ten characters of `A-Z 0-9 . _ ! ? -`, which is what GOBLIN HOARD's bitmap
+font can draw, and a player's line always shows the name they used last.
+
+Where people see it:
+
+- **In the games.** The title screen alternates with the table, arcade attract-loop style, and left
+  and right flip it by hand. The table says what it takes to get on ("BEAT 0012345 TO GET ON THE
+  TABLE"), or, for a player already on it, "YOU ARE #3 - DON'T GET KNOCKED OFF". When a run ends
+  with points, a form offers to carve a name into the table. It remembers the name, so after the
+  first time posting is a single Enter, and a first-timer is offered a random goblin name to accept
+  or type over. Escape skips. Then a ranks screen shows where the run landed with the player's own
+  line lit up, or, if it missed, the score to beat.
+- **On ipgoblin.com.** Each arcade card shows the game's current leader (`site/arcade.js`).
+- **At [scores.ipgoblin.com](https://scores.ipgoblin.com).** Both tables as a plain web page.
+
+#### API
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/` | GET | Both tables as a web page. `?format=json` for the data. |
+| `/v1/boards` | GET | Both tables as JSON. `?limit=1-10`, default 3. |
+| `/v1/<game>/leaderboard` | GET | One game's table. `?limit=1-10` (default 10); `?player=<id>` marks that player's line with `you`. |
+| `/v1/<game>/runs` | POST | Starts a run and returns its run token. Only from the game's own origin. |
+| `/v1/<game>/scores` | POST | `{ run, player, name, score, level, won }`. Only from the game's own origin. |
+
+`<game>` is `goblin-hoard` or `ghoul-time`. Reads are open to anyone, with CORS `*`. A table comes
+back as `{ size, top, cutoff }`, where `cutoff` is the score a run has to beat to get on: the tenth
+place's, or 0 while there are empty places.
+
+```sh
+curl -s https://scores.ipgoblin.com/v1/boards | jq .
+```
+
+#### Keeping it honest
+
+Nothing that runs in a browser can prove a score was earned, so the aim is to stop the casual cheat
+and bound the damage from the rest:
+
+- **Run tokens.** A game asks for a token when a run starts and hands it back with the score. The
+  token carries its issue time and is HMAC-signed with the `RUN_KEY` secret, so the Worker knows how
+  long the run took without storing anything up front. A token posts once.
+- **Plausibility.** GOBLIN HOARD's levels are finite and nothing respawns, so each level has a hard
+  ceiling, counted from `levels.js`. GHOUL TIME never ends, so it is held to a pace instead. Both are
+  in `scores-worker/src/games.js` and are generous on purpose: turning away a real run is worse than
+  letting an odd one through. Rejected scores are logged, so `npm run tail` shows them.
+- **Origin.** Writes are only accepted from the game's own origin. That only binds browsers, but it
+  keeps other sites from posting.
+- **Rate limits** per IP, with the Workers rate limiting binding: 120 reads, 30 run starts and 10
+  scores a minute, counted at each Cloudflare location. Nothing is stored.
+- **Names** are checked for slurs and the worst profanity, including disguised spellings. The word
+  lists are in `scores-worker/src/names.js`, rot13-encoded so the source does not read as a list of
+  slurs.
+
+Someone who reads the game code can still post a believable fake. That is what moderation is for.
+
+#### Moderation
+
+It is all in D1, so moderation is SQL, run from `scores-worker/`:
+
+```sh
+# the latest scores, with the player id to act on
+npx wrangler d1 execute ipgoblin-scores --remote --command \
+  "SELECT id, game, player, name, score, level, seconds, datetime(created_at / 1000, 'unixepoch') AS at
+   FROM runs ORDER BY id DESC LIMIT 20"
+
+# take a player off every table
+npx wrangler d1 execute ipgoblin-scores --remote --command \
+  "UPDATE bests SET hidden = 1 WHERE player = '<player id>'"
+```
+
+Hiding sticks, because a posted score never changes a player's `hidden` flag. Set it back to `0` to
+undo it. `runs` keeps every accepted score, so a table can always be rebuilt from it.
+
+#### Privacy and budget
+
+The scoreboard keeps the name, score, level reached, when, and the random player id. No IP
+addresses, no cookies, no accounts, and both the name form and the arcade section on ipgoblin.com
+say so. A player who rolls off the table keeps their row in `bests`, out of sight, because that is
+how a later run knows whether it beat their best.
+
+Every request is a Worker invocation, so it counts against the account-wide 100,000 a day. D1's free
+plan allows 5 million rows read and 100,000 written a day: a table read walks an index and reads
+about as many rows as it returns, and posting a score writes a handful.
+
+#### Working on the scores
+
+```sh
+cd scores-worker
+npm install
+cp .dev.vars.example .dev.vars   # a local RUN_KEY, and lets games on localhost post
+npm run migrate:local
+npm run dev                      # http://127.0.0.1:8789
+npm test                         # node --test, against Node's built-in SQLite (Node 22.13+)
+```
+
+Games served from `localhost` or `127.0.0.1` talk to the local Worker on port 8789; everywhere else
+they talk to scores.ipgoblin.com.
+
+#### Deploying the scores
+
+The D1 database already exists and its id is in `wrangler.toml`. The first deploy is:
+
+```sh
+cd scores-worker
+npm install
+npm run migrate:remote                                  # create the tables
+npm run deploy                                          # creates scores.ipgoblin.com
+openssl rand -hex 32 | npx wrangler secret put RUN_KEY  # sign run tokens
+```
+
+Until `RUN_KEY` is set the tables can be read but no run can start, and the games say the
+scoreboard is out of reach. Then deploy both games with `npm run deploy` and publish the site with
+`./scripts/publish-gh-pages.sh`.
+
+Later schema changes go in a new numbered file in `scores-worker/migrations/`, applied with
+`npm run migrate:remote` before the deploy that needs them.
 
 ## Checking usage
 

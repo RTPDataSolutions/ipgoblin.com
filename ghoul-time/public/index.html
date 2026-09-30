@@ -23,11 +23,52 @@
         font-size:18px; display:flex; align-items:center; justify-content:center; touch-action:none; }
   .btn:active{ background:#7cf03a; color:#12200a; }
   #salt{ width:84px; height:84px; border-radius:50%; font-size:12px; letter-spacing:1px; }
+
+  /* ---- the name form, over the canvas when a run ends ---- */
+  #stage{ position:relative; line-height:0; }
+  .entry{ position:absolute; left:50%; bottom:4%; z-index:5; transform:translateX(-50%);
+          width:min(94%,400px); margin:0; padding:12px 14px 10px; line-height:1.35; text-align:center;
+          color:#cbbde8; background:rgba(18,10,34,.96); border:2px solid #7cf03a; border-radius:4px;
+          box-shadow:0 0 28px rgba(124,240,58,.18), 0 10px 30px rgba(0,0,0,.8); }
+  .entry[hidden]{ display:none; }
+  .entry p{ margin:0; }
+  .entry-title{ color:#7cf03a; font-size:16px; font-weight:700; letter-spacing:.14em; }
+  .entry-score{ margin-top:2px !important; font-size:12px; letter-spacing:.12em; color:#8a7ab5; }
+  .entry-score span{ color:#ffe66d; font-weight:700; }
+  .entry-row{ display:flex; justify-content:center; gap:8px; margin-top:10px; }
+  /* 16px or larger, or iOS zooms the page when the field is focused. */
+  .entry-name{ width:12.5ch; min-width:0; padding:6px 8px; font:inherit; font-size:16px; font-weight:700;
+               letter-spacing:.14em; text-transform:uppercase; color:#ffe66d; caret-color:#7cf03a;
+               background:#07050c; border:2px solid #4d3c72; border-radius:4px; outline:none; }
+  .entry-name:focus{ border-color:#7cf03a; }
+  .entry-btn{ padding:6px 12px; font:inherit; font-size:13px; font-weight:700; letter-spacing:.1em; color:#cbbde8;
+              background:#2a2040; border:2px solid #4d3c72; border-radius:4px; cursor:pointer; }
+  .entry-go{ color:#12200a; background:#7cf03a; border-color:#7cf03a; }
+  .entry-btn:hover,.entry-btn:focus-visible{ outline:2px solid #ff8ae2; outline-offset:1px; }
+  .entry-btn:disabled,.entry-name:disabled{ opacity:.55; cursor:default; }
+  .entry-msg{ min-height:1.35em; margin-top:6px !important; font-size:12px; letter-spacing:.06em; color:#7cf03a; }
+  .entry-msg.is-error{ color:#ff5f7e; }
+  .entry-note{ font-size:10px; color:#8a7ab5; }
 </style>
 </head>
 <body>
 <div id="app">
-  <canvas id="cv"></canvas>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <form id="entry" class="entry" hidden novalidate autocomplete="off" aria-labelledby="entry-title">
+      <p id="entry-title" class="entry-title">SIGN THE MENU</p>
+      <p class="entry-score">SCORE <span id="entry-score">0</span></p>
+      <div class="entry-row">
+        <input id="entry-name" class="entry-name" type="text" name="name" maxlength="10"
+               autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="send"
+               aria-label="Your name for the high score table">
+        <button id="entry-post" class="entry-btn entry-go" type="submit">POST</button>
+        <button id="entry-skip" class="entry-btn" type="button">SKIP</button>
+      </div>
+      <p id="entry-msg" class="entry-msg" role="status" aria-live="polite"></p>
+      <p class="entry-note">Public, at scores.ipgoblin.com. Nothing else is kept.</p>
+    </form>
+  </div>
   <div id="tips"><b>ARROWS / WASD</b> move &amp; climb &nbsp;•&nbsp; <b>SPACE</b> throw grave salt &nbsp;•&nbsp; <b>P</b> pause</div>
   <div id="pad">
     <div class="dpad">
@@ -122,7 +163,10 @@ const SFX={
 const K={left:0,right:0,up:0,down:0,fire:0};
 const MAP={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',
   KeyA:'left',KeyD:'right',KeyW:'up',KeyS:'down',Space:'fire',KeyJ:'fire'};
+// Keys typed into the name form belong to the form, not the chef.
+const inForm=e=>!!(e.target&&e.target.closest&&e.target.closest('#entry'));
 addEventListener('keydown',e=>{
+  if(inForm(e)) return;
   if(MAP[e.code]!==undefined||e.code==='KeyP'){ e.preventDefault(); }
   ac();
   if(e.code==='KeyP'){ if(G.state==='play') G.state='pause'; else if(G.state==='pause') G.state='play'; return; }
@@ -130,7 +174,8 @@ addEventListener('keydown',e=>{
   if(!K[k]) onPress(k);
   K[k]=1;
 },{passive:false});
-addEventListener('keyup',e=>{ const k=MAP[e.code]; if(k){ K[k]=0; e.preventDefault(); } },{passive:false});
+// Not filtered like keydown: a key held before the form took focus must still let go.
+addEventListener('keyup',e=>{ const k=MAP[e.code]; if(k){ K[k]=0; if(!inForm(e)) e.preventDefault(); } },{passive:false});
 
 function releaseKeys(){ for(const k in K) K[k]=0; }
 function autoPause(){
@@ -142,9 +187,12 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) autoPause
 
 function onPress(k){
   if(k==='fire'){
-    if(G.state==='title'||G.state==='gameover'){ startGame(); }
+    if(G.state==='title') startGame();
+    else if(G.state==='gameover') gameOverContinue();
+    else if(G.state==='ranks'){ if(G.endT>0.8) startGame(); }
     else if(G.state==='play') throwSalt();
   }
+  if((k==='left'||k==='right')&&G.state==='title') flipPage(k==='left'?-1:1);
 }
 document.querySelectorAll('#pad .btn').forEach(b=>{
   const k=b.dataset.k;
@@ -156,7 +204,10 @@ document.querySelectorAll('#pad .btn').forEach(b=>{
   b.addEventListener('mousedown',dn); b.addEventListener('mouseup',up); b.addEventListener('mouseleave',up);
 });
 cv.addEventListener('pointerdown',()=>{ ac();
-  if(G.state==='title'||G.state==='gameover') startGame();
+  if(EN.open) return;
+  if(G.state==='title') startGame();
+  else if(G.state==='gameover') gameOverContinue();
+  else if(G.state==='ranks'){ if(G.endT>0.8) startGame(); }
   else if(G.state==='pause') G.state='play';
 });
 
@@ -164,7 +215,9 @@ cv.addEventListener('pointerdown',()=>{ ac();
 const G={
   state:'title', score:0, lives:3, level:1, salt:5,
   high: +(localStorage.getItem('ghoultime_high')||0),
-  msg:'', msgT:0, t:0, shake:0, dieT:0, clearT:0, startT:0
+  msg:'', msgT:0, t:0, shake:0, dieT:0, clearT:0, startT:0,
+  // high scores: which title page is up, and how posting this run is going
+  page:0, pageT:0, post:'none', posted:null, endT:0
 };
 let player=null, foes=[], ing=[], groups=[], clouds=[], bits=[], item=null, itemT=0;
 
@@ -439,7 +492,7 @@ function killPlayer(){
 }
 function respawn(){
   G.lives--;
-  if(G.lives<0){ G.state='gameover'; G.msg='GAME OVER'; return; }
+  if(G.lives<0){ endRun(); return; }
   player.x=lx(10); player.floor=5; player.y=fy(5); player.mode='walk'; player.ride=null; player.inv=2.2;
   foes.forEach((f,i)=>{ const s=SPAWNS[i%SPAWNS.length]; f.x=s.x; f.y=fy(s.f); f.floor=s.f; f.mode='walk'; f.stun=0; f.dead=0; });
   clouds=[]; G.state='play';
@@ -453,11 +506,180 @@ function checkClear(){
 }
 function startGame(){
   G.score=0; G.lives=3; G.level=1; G.salt=5; G.state='play'; G.startT=1.2;
+  G.post='none'; G.posted=null;
+  SB.startRun();
   buildLevel(); ac();
 }
 function nextLevel(){
   G.level++; G.salt=Math.min(9,G.salt+2); G.state='play'; G.startT=1.2;
   buildLevel();
+}
+
+/* ============================== HIGH SCORES ============================== */
+// The world tables live at scores.ipgoblin.com. All of it is optional: if the
+// scoreboard cannot be reached the game plays as before, the title never flips
+// to the tables, and game over says the scoreboard is out of reach.
+//
+// A run asks for a token when it starts and hands it back with the score, so
+// the scoreboard can check the score against how long the run took.
+const NAME_MAX=10;
+// Offered to a first-time player so posting is one keypress. Typing replaces it.
+const CHEF_NAMES=['GHOULASH','SLIMEBALL','BONEBROTH','GRAVY','TOADSTOOL','BOGBREATH','BATWING',
+  'GRUEL','SOUS GHOUL','EYEBALL','GRAVESALT','CAULDRON','NIGHTSHADE','MOLDY','SLOPPY'];
+
+// The scoreboard's own name rules, so what you type is what goes up.
+function cleanName(raw){
+  return String(raw==null?'':raw).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase()
+    .replace(/[^A-Z0-9 ._!?-]/g,'').replace(/\s+/g,' ').trim().slice(0,NAME_MAX).trim();
+}
+function stored(k,v){
+  try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v); }catch(e){}
+  return null;
+}
+
+const SB={
+  base: (location.hostname==='localhost'||location.hostname==='127.0.0.1')
+    ? 'http://127.0.0.1:8789' : 'https://scores.ipgoblin.com',
+  // Not an account: a random id so your best run is one line on the board.
+  player: (()=>{
+    let p=stored('ghoultime_player')||'';
+    if(!/^[A-Za-z0-9_-]{16,64}$/.test(p)){
+      p=crypto.randomUUID ? crypto.randomUUID()
+        : Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+      stored('ghoultime_player',p);
+    }
+    return p;
+  })(),
+  name: cleanName(stored('ghoultime_name')||''),
+  table:null, at:0, loading:null, tried:-1e9, run:null, runReq:null,
+
+  get age(){ return this.table ? (performance.now()-this.at)/1000 : Infinity; },
+
+  async req(path,body){
+    const ctrl=new AbortController(), timer=setTimeout(()=>ctrl.abort(),8000);
+    const init = body===undefined ? {signal:ctrl.signal}
+      : {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:ctrl.signal};
+    let res;
+    try{ res=await fetch(this.base+path,init); }
+    catch(e){ throw new Error('Could not reach the scoreboard.'); }
+    finally{ clearTimeout(timer); }
+    const data=await res.json().catch(()=>null);
+    if(!res.ok){ const err=new Error((data&&data.error)||'The scoreboard said '+res.status+'.'); err.status=res.status; throw err; }
+    return data;
+  },
+  accept(d){ this.table=d; this.at=performance.now(); },
+  // Never throws. At most one try every ten seconds unless forced, so a
+  // scoreboard that is down is not asked again every frame.
+  refresh(force){
+    if(this.loading) return this.loading;
+    if(!force && performance.now()-this.tried<10000) return Promise.resolve();
+    this.tried=performance.now();
+    this.loading=this.req('/v1/ghoul-time/leaderboard?player='+encodeURIComponent(this.player))
+      .then(d=>this.accept(d)).catch(()=>{}).finally(()=>{ this.loading=null; });
+    return this.loading;
+  },
+  startRun(){
+    this.run=null;
+    const req=this.req('/v1/ghoul-time/runs',{})
+      .then(d=>{ if(this.runReq===req) this.run=d.run; }).catch(()=>{});
+    this.runReq=req;
+  },
+  async ready(){ if(!this.run&&this.runReq) await this.runReq; return !!this.run; },
+  async submit(o){
+    if(!(await this.ready())) throw new Error('The scoreboard was out of reach when this run started.');
+    let d;
+    try{ d=await this.req('/v1/ghoul-time/scores',{run:this.run,player:this.player,name:o.name,score:o.score,level:o.level}); }
+    catch(err){
+      // 409: this run already went up, e.g. an earlier answer never arrived.
+      if(err.status!==409) throw err;
+      this.run=null; await this.refresh(true);
+      return Object.assign({posted:null},this.table);
+    }
+    this.run=null;
+    this.name=d.posted.name; stored('ghoultime_name',this.name);
+    this.accept(d);
+    return d;
+  }
+};
+
+// A real form rather than text drawn on the canvas, so phones get their
+// keyboard, screen readers get a label, and IMEs just work.
+const EN={
+  form:document.getElementById('entry'), input:document.getElementById('entry-name'),
+  scoreEl:document.getElementById('entry-score'), msg:document.getElementById('entry-msg'),
+  postBtn:document.getElementById('entry-post'), skipBtn:document.getElementById('entry-skip'),
+  busy:false, shownAt:0,
+  get open(){ return !this.form.hidden; },
+  show(score,name){
+    this.scoreEl.textContent=score.toLocaleString('en-US');
+    this.input.value=name; this.say(''); this.setBusy(false);
+    this.form.hidden=false; this.shownAt=performance.now();
+    this.input.focus({preventScroll:true}); this.input.select();
+  },
+  hide(){ this.form.hidden=true; this.input.blur(); },
+  say(t,err){ this.msg.textContent=t; this.msg.classList.toggle('is-error',!!err); },
+  setBusy(on){
+    this.busy=on; this.input.disabled=on; this.postBtn.disabled=on; this.skipBtn.disabled=on;
+    if(!on&&this.open) this.input.focus({preventScroll:true});
+  }
+};
+EN.input.maxLength=NAME_MAX;
+EN.form.addEventListener('submit',e=>{ e.preventDefault(); entryPost(); });
+EN.skipBtn.addEventListener('click',()=>entrySkip());
+EN.input.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ e.preventDefault(); entrySkip(); }
+  // An Enter still held from before the form opened is not a decision.
+  if(e.key==='Enter'&&(e.repeat||performance.now()-EN.shownAt<300)) e.preventDefault();
+});
+EN.input.addEventListener('input',()=>{
+  const v=EN.input.value;
+  const c=v.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ._!?-]/g,'').slice(0,NAME_MAX);
+  if(c!==v) EN.input.value=c;
+  EN.say('');
+});
+
+// G.post: 'none' | 'waiting' | 'checking' | 'entry' | 'posting' | 'offline' | 'skipped'
+function endRun(){
+  G.state='gameover'; G.msg='GAME OVER'; G.endT=0;
+  G.post = G.score>0 ? 'waiting' : 'none';
+  G.posted=null;
+}
+// Offer the form once the scoreboard has confirmed it holds this run.
+function openEntry(){
+  G.post='checking';
+  SB.ready().then(ok=>{
+    if(G.post!=='checking') return;
+    if(!ok){ G.post='offline'; return; }
+    G.post='entry'; releaseKeys();
+    EN.show(G.score, SB.name||CHEF_NAMES[(Math.random()*CHEF_NAMES.length)|0]);
+  });
+}
+async function entryPost(){
+  if(EN.busy) return;
+  const name=cleanName(EN.input.value);
+  if(!/[A-Z0-9]/.test(name)){ EN.say('TYPE A NAME FIRST',true); EN.input.focus({preventScroll:true}); return; }
+  EN.input.value=name; G.post='posting'; EN.setBusy(true); EN.say('SIGNING...');
+  try{ G.posted=await SB.submit({name:name,score:G.score,level:G.level}); }
+  catch(err){ G.post='entry'; EN.setBusy(false); EN.say(String(err.message||err).toUpperCase(),true); return; }
+  EN.hide(); G.post='none'; G.state='ranks'; G.endT=0;
+  if(G.posted.posted&&G.posted.posted.improved) SFX.clear(); else SFX.bonus();
+}
+function entrySkip(){ if(EN.busy) return; EN.hide(); G.post='skipped'; }
+const canReplay=()=>G.post==='none'||G.post==='offline'||G.post==='skipped';
+function gameOverContinue(){
+  if(G.endT<0.3) return;
+  if(G.post==='waiting') openEntry();
+  else if(canReplay()) startGame();
+}
+
+// The title alternates with the tables, the way an arcade cabinet's attract
+// loop does. Left and right flip it by hand.
+function flipPage(d){ const n=SB.table?2:1; G.page=(G.page+d+n)%n; G.pageT=0; }
+function updateTitlePages(dt){
+  G.pageT+=dt;
+  if(G.pageT>(G.page===0?9:8)) flipPage(1);
+  // Pick up other players' scores while the table is on show.
+  if(G.page===1&&SB.age>90) SB.refresh();
 }
 
 /* ============================== DRAW HELPERS ============================== */
@@ -713,20 +935,79 @@ function panel(y,h){ ctx.globalAlpha=0.82; px(18,y,GW-36,h,'#120a22'); ctx.globa
 function drawTitle(){
   const cxm=GW/2;
   panel(64,190);
-  text('GHOUL TIME',cxm,78,'#7cf03a',20,'center');
-  text('S L I M E   C H E F',cxm,102,'#ff8ae2',9,'center');
-  text('Walk over every slab of a recipe to',cxm,126,'#cbbde8',8,'center');
-  text('knock it down. Stack all 4 cauldrons',cxm,138,'#cbbde8',8,'center');
-  text('to serve the slime and clear the level.',cxm,150,'#cbbde8',8,'center');
-  text('ARROWS / WASD  move + climb',cxm,172,'#ffe66d',8,'center');
-  text('SPACE  throw grave salt (stuns)',cxm,184,'#ffe66d',8,'center');
-  text('Drop slabs on ghouls for big points!',cxm,200,'#9ad8ff',8,'center');
+  if(G.page===1&&SB.table) drawTitleScores();
+  else {
+    text('GHOUL TIME',cxm,78,'#7cf03a',20,'center');
+    text('S L I M E   C H E F',cxm,102,'#ff8ae2',9,'center');
+    text('Walk over every slab of a recipe to',cxm,126,'#cbbde8',8,'center');
+    text('knock it down. Stack all 4 cauldrons',cxm,138,'#cbbde8',8,'center');
+    text('to serve the slime and clear the level.',cxm,150,'#cbbde8',8,'center');
+    text('ARROWS / WASD  move + climb',cxm,172,'#ffe66d',8,'center');
+    text('SPACE  throw grave salt (stuns)',cxm,184,'#ffe66d',8,'center');
+    text('Drop slabs on ghouls for big points!',cxm,200,'#9ad8ff',8,'center');
+  }
   if(Math.floor(G.t*2)%2===0) text(isTouch?'TAP TO START':'PRESS SPACE TO START',cxm,224,'#ffffff',10,'center');
+  if(SB.table) text('<  >  HIGH SCORES',cxm,332,'#8a7ab5',8,'center');
   // mascots
   drawFoe({kind:'ghost',x:52,y:246,anim:G.t*4,dead:0,stun:0,wob:G.t*4,dir:1});
   drawFoe({kind:'goblin',x:GW/2,y:250,anim:G.t*5,dead:0,stun:0,wob:0,dir:1});
   drawFoe({kind:'ghoul',x:GW-52,y:246,anim:G.t*4,dead:0,stun:0,wob:0,dir:-1});
   drawChef({x:110,y:300,dir:1,anim:G.t*6,mode:'walk',inv:0,ride:null});
+}
+
+/* ---------- high score tables ---------- */
+// What it takes to get on the table.
+function toGetOn(t){
+  if(t.cutoff>0) return 'BEAT '+String(t.cutoff).padStart(6,'0')+' TO GET ON THE TABLE';
+  const open=t.size-t.top.length;
+  return open===t.size ? 'THE TABLE IS EMPTY \u00b7 ANY SCORE GETS ON'
+    : open+(open===1?' PLACE':' PLACES')+' LEFT \u00b7 ANY SCORE GETS ON';
+}
+function drawTitleScores(){
+  const cxm=GW/2, t=SB.table, you=t.top.find(e=>e.you);
+  text('HIGH SCORES',cxm,70,'#7cf03a',16,'center');
+  text(you?'YOU ARE #'+you.rank+' \u00b7 DON\u2019T GET KNOCKED OFF':toGetOn(t),cxm,90,'#ff8ae2',8,'center');
+  drawTable(104,t);
+}
+// After posting: where the game landed, with your line lit up.
+function drawRanks(){
+  const cxm=GW/2, t=(G.posted&&G.posted.top)?G.posted:SB.table;
+  const you=t&&t.top.find(e=>e.you);
+  panel(44,222);
+  text(you?'#'+you.rank+' ON THE TABLE':(t&&t.cutoff)?'NOT ON THE TABLE':'SCORE POSTED',cxm,52,'#ff8ae2',16,'center');
+  const imp=G.posted&&G.posted.posted&&G.posted.posted.improved;
+  const sub=[];
+  if(imp) sub.push('NEW PERSONAL BEST!');
+  else if(you&&G.posted&&G.posted.posted) sub.push('YOUR BEST STILL STANDS');
+  if(!you&&t&&t.cutoff) sub.push('BEAT '+String(t.cutoff).padStart(6,'0')+' TO GET ON');
+  text(sub.join('  \u00b7  '),cxm,72,imp?'#ffe66d':'#cbbde8',9,'center');
+  if(t) drawTable(88,t);
+  text('THIS RUN  '+G.score.toLocaleString('en-US')+'  ON LEVEL '+G.level,cxm,210,'#cbbde8',8,'center');
+  text('EVERY TABLE LIVES AT SCORES.IPGOBLIN.COM',cxm,222,'#8a7ab5',8,'center');
+  if(G.endT>0.8&&Math.floor(G.t*2)%2===0) text(isTouch?'TAP TO PLAY AGAIN':'PRESS SPACE TO PLAY AGAIN',cxm,244,'#ffffff',10,'center');
+}
+// The top ten, one line per player, never reset. A name rolls off the
+// bottom when a better game comes in.
+function drawTable(y,t){
+  text('#',48,y,'#ffe66d',8,'right');
+  text('NAME',56,y,'#ffe66d',8,'left');
+  text('LEVEL',236,y,'#ffe66d',8,'right');
+  text('SCORE',300,y,'#ffe66d',8,'right');
+  px(30,y+10,276,1,'#3b2d55');
+  if(!t.top.length){
+    text('NOBODY YET',GW/2,y+34,'#cbbde8',9,'center');
+    text('THE TOP SPOT IS UP FOR GRABS',GW/2,y+48,'#8a7ab5',8,'center');
+    return;
+  }
+  t.top.slice(0,10).forEach((e,i)=>{
+    const ry=y+14+i*10;
+    if(e.you){ ctx.globalAlpha=0.55+0.25*Math.sin(G.t*5); px(28,ry-1,280,10,'#3a2560'); ctx.globalAlpha=1; }
+    const c=e.you?'#ff8ae2':null;
+    text(String(e.rank),48,ry,c||'#8a7ab5',9,'right');
+    text(e.name,56,ry,c||(e.rank===1?'#ffe66d':'#cbbde8'),9,'left');
+    text('LV '+e.level,236,ry,c||'#8a7ab5',9,'right');
+    text(String(e.score).padStart(6,'0'),300,ry,c||'#7cf03a',9,'right');
+  });
 }
 
 /* ============================== MAIN LOOP ============================== */
@@ -751,6 +1032,14 @@ function frame(now){
     if(G.dieT<=0) respawn();
   } else if(G.state==='clear'){
     G.clearT-=dt; if(G.clearT<=0) nextLevel();
+  } else if(G.state==='gameover'){
+    G.endT+=dt;
+    // Give GAME OVER a moment on screen, unless the player moves on first.
+    if(G.post==='waiting'&&G.endT>1.4) openEntry();
+  } else if(G.state==='ranks'){
+    G.endT+=dt;
+  } else if(G.state==='title'){
+    updateTitlePages(dt);
   }
   if(G.shake>0) G.shake=Math.max(0,G.shake-dt*22);
 
@@ -798,15 +1087,18 @@ function frame(now){
   if(G.state==='clear'){ panel(150,44);
     text('SLIME SERVED!',cxm,158,'#7cf03a',13,'center');
     text('BONUS  '+(1000+G.salt*150),cxm,176,'#ffe66d',9,'center'); }
-  if(G.state==='gameover'){ panel(140,64);
+  if(G.state==='gameover'){ const off=G.post==='offline'; panel(140,off?76:64);
     text('GAME OVER',cxm,150,'#ff5f7e',16,'center');
     text('SCORE '+G.score,cxm,172,'#cbbde8',9,'center');
-    if(Math.floor(G.t*2)%2===0) text(isTouch?'TAP TO PLAY AGAIN':'PRESS SPACE TO PLAY AGAIN',cxm,186,'#ffffff',8,'center'); }
+    if(off) text('THE SCOREBOARD IS OUT OF REACH',cxm,200,'#8a7ab5',8,'center');
+    if(canReplay()&&Math.floor(G.t*2)%2===0) text(isTouch?'TAP TO PLAY AGAIN':'PRESS SPACE TO PLAY AGAIN',cxm,186,'#ffffff',8,'center'); }
+  if(G.state==='ranks') drawRanks();
 
   ctx.restore();
   requestAnimationFrame(frame);
 }
 buildLevel();
+SB.refresh(true);
 requestAnimationFrame(frame);
 })();
 </script>

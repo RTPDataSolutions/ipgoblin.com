@@ -145,6 +145,111 @@ canvas {
 .tbtn-jump { border-color: rgba(255, 210, 63, .6); color: #ffd23f; }
 .tbtn-atk  { border-color: rgba(216, 56, 47, .6);  color: #ef6a5e; }
 
+/* ---- name entry, shown over the canvas when a run ends ---- */
+
+.entry {
+  position: absolute;
+  left: 50%;
+  bottom: 3%;
+  z-index: 5;
+  transform: translateX(-50%);
+  width: min(94%, 430px);
+  margin: 0;
+  padding: 12px 14px 10px;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--goblin);
+  background: rgba(11, 18, 7, .95);
+  border: 2px solid var(--goblin-dim);
+  border-radius: 3px;
+  box-shadow: 0 0 0 4px #0a1006, 0 10px 30px rgba(0, 0, 0, .7);
+}
+
+.entry p { margin: 0; }
+
+.entry-title {
+  color: #ffd23f;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+.entry-score {
+  margin-top: 2px !important;
+  font-size: 12px;
+  letter-spacing: .12em;
+  color: var(--goblin-dim);
+}
+
+.entry-score span { color: #fff3a8; }
+
+.entry-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* 16px or larger, or iOS zooms the page when the field is focused. */
+.entry-name {
+  width: 12.5ch;
+  min-width: 0;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #fff3a8;
+  caret-color: var(--goblin);
+  background: #050904;
+  border: 2px solid var(--goblin-dim);
+  border-radius: 3px;
+  outline: none;
+}
+
+.entry-name:focus { border-color: var(--goblin); }
+
+.entry-btn {
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--goblin-dim);
+  background: none;
+  border: 2px solid var(--goblin-dim);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.entry-go { color: #ffd23f; border-color: #c08611; }
+
+.entry-btn:hover,
+.entry-btn:focus-visible { color: var(--ink); background: var(--goblin); border-color: var(--goblin); outline: none; }
+
+.entry-btn:disabled,
+.entry-name:disabled { opacity: .55; cursor: default; }
+
+.entry-msg {
+  min-height: 1.35em;
+  margin-top: 6px !important;
+  font-size: 12px;
+  letter-spacing: .08em;
+  color: var(--goblin);
+}
+
+.entry-msg.is-error { color: #ef6a5e; }
+
+.entry-note {
+  font-size: 10px;
+  letter-spacing: .04em;
+  color: var(--goblin-dim);
+}
+
+/* The pads would sit under the form and could post it by accident. */
+.entry-open .touch { visibility: hidden; }
+
 .noscript {
   padding: 24px;
   text-align: center;

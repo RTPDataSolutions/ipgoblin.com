@@ -1,0 +1,10 @@
+# Local development only. Copy to .dev.vars (which is gitignored):
+#   cp .dev.vars.example .dev.vars
+#
+# Production uses a real secret instead:
+#   openssl rand -hex 32 | npx wrangler secret put RUN_KEY
+RUN_KEY=local-development-key-not-a-secret
+
+# Lets the games post from http://127.0.0.1:<port> while they run locally.
+# Never set this in production.
+ALLOW_LOCAL_ORIGINS=true
