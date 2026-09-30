@@ -1,0 +1,51 @@
+name = "ipgoblin-scores"
+main = "src/index.js"
+compatibility_date = "2026-09-04"
+
+workers_dev = false
+
+[[routes]]
+pattern = "scores.ipgoblin.com"
+custom_domain = true
+
+[dev]
+port = 8789
+ip = "127.0.0.1"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ipgoblin-scores"
+database_id = "b2575cc8-63ee-41f2-a8d4-a4a766da4cb4"
+migrations_dir = "migrations"
+
+# Per-IP limits, counted at each Cloudflare location. Nothing is stored.
+# namespace_id only has to be unique within the account.
+[[ratelimits]]
+name = "READ_LIMIT"
+namespace_id = "4201"
+
+  [ratelimits.simple]
+  limit = 120
+  period = 60
+
+[[ratelimits]]
+name = "RUN_LIMIT"
+namespace_id = "4202"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
+[[ratelimits]]
+name = "SCORE_LIMIT"
+namespace_id = "4203"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
+# RUN_KEY, which signs run tokens, is a secret:
+#   openssl rand -hex 32 | npx wrangler secret put RUN_KEY

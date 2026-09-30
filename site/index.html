@@ -136,8 +136,9 @@
   <section class="arcade-section" id="arcade">
     <h2 class="label center">The goblin arcade</h2>
     <p class="arcade-intro">
-      The goblins built an arcade in a spare corner of the network. No quarters, no accounts,
-      nothing kept. Just some very greedy goblins and questionable level design.
+      The goblins built an arcade in a spare corner of the network. No quarters, no accounts. The
+      only thing the goblins keep is the name you carve into the high score tables, and they wipe
+      the weekly ones every Monday, so the crown is always up for grabs.
     </p>
 
     <div class="arcade-grid">
@@ -146,9 +147,10 @@
         <h3 class="arcade-title">GOBLIN HOARD</h3>
         <p class="arcade-copy">
           Whip, leap and loot your way out of the packet mines. Four levels, ghouls and vampires
-          in the way, one extremely rude boss, and a high score the goblins will hold over you
-          forever.
+          in the way, one extremely rude boss, and a high score table the goblins will hold over
+          you forever.
         </p>
+        <p class="arcade-leader" data-leader="goblin-hoard" hidden></p>
         <span class="btn">Play it &rarr;</span>
       </a>
 
@@ -159,9 +161,14 @@
           A ghoul chef assembling slime recipes in a haunted kitchen. Walk the slabs down, fill
           all four cauldrons, and try not to get cornered.
         </p>
+        <p class="arcade-leader" data-leader="ghoul-time" hidden></p>
         <span class="btn">Play it &rarr;</span>
       </a>
     </div>
+
+    <p class="arcade-scores">
+      <a href="https://scores.ipgoblin.com/" target="_blank" rel="noopener noreferrer">See the high score tables &rarr;</a>
+    </p>
   </section>
 
   <footer class="footer">
@@ -182,5 +189,6 @@
 
 <script src="app.js"></script>
 <script src="speedtest.js"></script>
+<script src="arcade.js"></script>
 </body>
 </html>

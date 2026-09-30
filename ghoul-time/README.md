@@ -15,6 +15,7 @@ edge network and costs nothing per request (static assets are not billed as Work
 | Arrow keys / WASD | Move and climb ladders |
 | Space / J | Throw grave salt (stuns ghouls ~4s) |
 | P | Pause / resume |
+| ← / → on the title | Flip to the high score tables |
 
 Walk across all four segments of a recipe slab to knock it down. A falling slab lands on the slab
 below and **cascades** — chaining layers together. Fill all four cauldrons to serve the slime and
@@ -33,7 +34,25 @@ clear the level.
 **Enemies:** Ghost, Goblin and Ghoul, each with different speeds and ladder-seeking AI. They get
 faster and more numerous each level. Ride a falling slab to escape a corner.
 
-Four ladder layouts rotate across levels. High score persists via `localStorage`.
+Four ladder layouts rotate across levels. Your own best (the HUD's `HI`) persists via `localStorage`.
+
+## High scores
+
+Every game that scores can go on the world tables at
+[scores.ipgoblin.com](https://scores.ipgoblin.com): one wiped every Monday, one all time, one line
+per player. The tables are kept by the `scores-worker/` Worker; the repository README's
+*High scores* section covers the service, its API and how scores are checked.
+
+- **The title screen** alternates with the tables, arcade attract-loop style, and ← / → flip it.
+- **At game over**, a form offers to sign your name onto the menu. It remembers the name, so after
+  the first time posting is a single Enter; the first time it suggests a chef name to accept or type
+  over. Esc skips.
+- **After posting**, a panel shows where the game landed on both tables with your line lit up, even
+  far below the top ten. Space plays again.
+
+While the form has focus, the game leaves keys alone, so typing a name never moves the chef. Each
+game asks the scoreboard for a run token when it starts; if the scoreboard cannot be reached the
+game plays exactly as before and game over says so.
 
 ## Local development
 
@@ -43,7 +62,12 @@ npm run dev          # serves at http://127.0.0.1:8787 via the real Workers runt
 ```
 
 The game is entirely contained in `public/index.html`, so you can also just open that file
-directly in a browser — no server required.
+directly in a browser — no server required. Opened that way it can show the tables but cannot post
+to them, since the scoreboard only takes scores from the game's own site.
+
+Served from `localhost` or `127.0.0.1`, the game talks to a local scores Worker on port 8789
+instead of scores.ipgoblin.com: `npm run dev` in `../scores-worker`, after the first-time setup in
+the repository README.
 
 ## Deploy
 

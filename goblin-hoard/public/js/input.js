@@ -28,18 +28,26 @@ const PADMAP = {
 
 const blank = () => ACTIONS.reduce((o, a) => { o[a] = false; return o; }, {});
 
+/** Keys typed into the name form belong to it, not the goblin. */
+function inForm(e) {
+  const t = e.target;
+  return !!(t && t.closest && t.closest('#entry'));
+}
+
 export class Input {
   constructor(root) {
     this.keys = blank();
     this.pad = blank();
     this.touch = blank();
     this.prev = blank();
+    this.padPrev = blank();
     this.usedTouch = false;
     this.onMute = null;
     // Edge-triggered focus tracking. Checked once per frame in poll().
     this.hadFocus = typeof document !== 'undefined' && document.hasFocus();
 
     window.addEventListener('keydown', (e) => {
+      if (inForm(e)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) {
         // A browser shortcut is starting (Cmd+L, Ctrl+T, Alt+Tab...). Focus is
         // usually about to leave the page, and the matching keyup for anything
@@ -56,9 +64,14 @@ export class Input {
       if (e.code === 'KeyM' && !e.repeat && this.onMute) { this.onMute(); e.preventDefault(); }
     }, { passive: false });
 
+    // Deliberately not filtered like keydown: a key pressed before the name
+    // form took focus must still be let go of, or it stays held forever.
     window.addEventListener('keyup', (e) => {
       const a = KEYMAP[e.code];
-      if (a) { this.keys[a] = false; e.preventDefault(); }
+      if (a) {
+        this.keys[a] = false;
+        if (!inForm(e)) e.preventDefault();
+      }
     }, { passive: false });
 
     window.addEventListener('blur', () => this.releaseAll());
@@ -141,6 +154,9 @@ export class Input {
 
   pressed(a) { return this.down(a) && !this.prev[a]; }
 
+  /** Like `pressed`, but only for the gamepad. */
+  padPressed(a) { return this.pad[a] && !this.padPrev[a]; }
+
   /** "Any of the confirm buttons" - used by the menu screens. */
   confirmPressed() {
     return this.pressed('start') || this.pressed('jump') || this.pressed('attack');
@@ -149,6 +165,9 @@ export class Input {
   get axis() { return (this.down('right') ? 1 : 0) - (this.down('left') ? 1 : 0); }
 
   endFrame() {
-    for (const a of ACTIONS) this.prev[a] = this.down(a);
+    for (const a of ACTIONS) {
+      this.prev[a] = this.down(a);
+      this.padPrev[a] = this.pad[a];
+    }
   }
 }

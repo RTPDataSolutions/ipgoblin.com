@@ -17,12 +17,16 @@ import { Level } from './level.js';
 import { LEVELS } from './levels.js';
 import { Player } from './player.js';
 import { Pickup, Chest, Door, ENEMY_CLASSES } from './entities.js';
+import { Scoreboard } from './scores.js';
+import { NameEntry } from './entry.js';
 
 const VIEW_W = 384;
 const VIEW_H = 216;
 const STEP = 1 / 60;
 const STORE_BEST = 'goblin-hoard.best';
 const STORE_MUTE = 'goblin-hoard.muted';
+// How long each title page stays up before the attract loop flips it.
+const TITLE_PAGE_SECONDS = [9, 8];
 
 const store = {
   get(key, fallback) {
@@ -54,6 +58,18 @@ class Game {
     this.input = new Input(document.getElementById('shell'));
     this.input.bindScreenTap(this.canvas);
     this.input.onMute = () => this.toggleSound();
+
+    this.scores = new Scoreboard(store);
+    this.scores.refresh();
+    this.entry = new NameEntry(document.querySelector('.stage'));
+    this.entry.onPost = (name) => this.postScore(name);
+    this.entry.onSkip = () => this.skipEntry();
+    // 'none' | 'waiting' | 'checking' | 'entry' | 'posting' | 'offline' | 'skipped'
+    this.post = 'none';
+    this.posted = null;
+    this.endT = 0;
+    this.titlePage = 0;
+    this.titlePageT = 0;
 
     this.cam = { x: 0, y: 0 };
     this.entities = [];
@@ -164,6 +180,7 @@ class Game {
 
   startRun() {
     this.resetRun();
+    this.scores.startRun();
     this.startLevel(0);
   }
 
@@ -248,9 +265,7 @@ class Game {
   respawnPlayer() {
     this.lives--;
     if (this.lives <= 0) {
-      this.state = 'gameover';
-      this.commitBest();
-      this.sound.music('defeat');
+      this.endRun('gameover');
       return;
     }
     // Clear anything in flight so the goblin does not land in a bullet.
@@ -286,6 +301,91 @@ class Game {
       this.best = this.score;
       store.set(STORE_BEST, this.best);
     }
+  }
+
+  /* ------------------------------------------------------- high scores  */
+
+  /** `state` is 'gameover' or 'victory'. */
+  endRun(state) {
+    this.state = state;
+    this.commitBest();
+    this.sound.music(state === 'victory' ? 'victory' : 'defeat');
+    this.endT = 0;
+    this.post = this.score > 0 ? 'waiting' : 'none';
+    this.posted = null;
+  }
+
+  /** Offer the name form, once the scoreboard has confirmed it holds this run. */
+  openEntry() {
+    this.post = 'checking';
+    this.scores.ready().then((ok) => {
+      if (this.post !== 'checking') return;
+      if (!ok) { this.post = 'offline'; return; }
+      this.post = 'entry';
+      this.input.releaseAll();
+      this.entry.show({
+        title: this.state === 'victory' ? 'THE HOARD IS YOURS' : 'CARVE YOUR NAME',
+        score: this.score,
+        name: this.scores.suggestedName,
+      });
+    });
+  }
+
+  async postScore(name) {
+    this.post = 'posting';
+    this.entry.setBusy(true);
+    this.entry.say('CARVING...');
+    try {
+      this.posted = await this.scores.submit({
+        name,
+        score: this.score,
+        level: this.levelIndex + 1,
+        won: this.state === 'victory',
+      });
+    } catch (err) {
+      this.post = 'entry';
+      this.entry.setBusy(false);
+      this.entry.say(String(err.message || err).toUpperCase(), true);
+      return;
+    }
+    this.entry.hide();
+    this.post = 'none';
+    this.state = 'ranks';
+    this.endT = 0;
+    const improved = this.posted.posted?.improved;
+    this.sound.sfx(improved && (improved.week || improved.all) ? 'key' : 'select');
+  }
+
+  skipEntry() {
+    this.entry.hide();
+    this.post = 'skipped';
+  }
+
+  toTitle() {
+    this.state = 'title';
+    this.resetRun();
+    this.post = 'none';
+    this.titlePage = 0;
+    this.titlePageT = 0;
+    this.sound.music('title');
+    if (this.scores.age > 30) this.scores.refresh();
+  }
+
+  /**
+   * The title screen alternates with the high score table, the way an arcade
+   * cabinet's attract loop does. Left and right flip it by hand.
+   */
+  updateTitlePages(dt) {
+    const pages = this.scores.boards ? 2 : 1;
+    this.titlePageT += dt;
+    const flip = this.input.pressed('left') || this.input.pressed('right') ||
+      this.titlePageT > TITLE_PAGE_SECONDS[this.titlePage];
+    if (flip) {
+      this.titlePage = (this.titlePage + 1) % pages;
+      this.titlePageT = 0;
+    }
+    // Pick up other players' scores, and the new week once this one is wiped.
+    if (this.titlePage === 1 && (this.scores.age > 90 || this.scores.resetIn <= 0)) this.scores.refresh();
   }
 
   /* ------------------------------------------------------------ main loop */
@@ -324,6 +424,7 @@ class Game {
           this.fx.sparkle(30, 176, [C.goldL, C.white]);
         }
         this.fx.update(dt);
+        this.updateTitlePages(dt);
         if (this.input.confirmPressed()) {
           this.sound.unlock();
           this.sound.sfx('select');
@@ -354,9 +455,7 @@ class Game {
         this.clearT -= dt;
         if (this.clearT <= 0) {
           if (this.levelIndex + 1 >= LEVELS.length) {
-            this.state = 'victory';
-            this.commitBest();
-            this.sound.music('victory');
+            this.endRun('victory');
           } else {
             this.startLevel(this.levelIndex + 1);
           }
@@ -366,11 +465,32 @@ class Game {
       case 'gameover':
       case 'victory':
         this.fx.update(dt);
-        if (this.input.confirmPressed()) {
+        this.endT += dt;
+        if (this.post === 'entry') {
+          // Keyboard, mouse and touch use the form itself. A gamepad cannot
+          // type, so A or B posts the name in the box and Start skips.
+          if (this.input.padPressed('jump')) this.entry.post();
+          else if (this.input.padPressed('pause')) this.entry.skip();
+          break;
+        }
+        if (this.post === 'checking' || this.post === 'posting') break;
+        if (this.post === 'waiting') {
+          // Give the result a moment on screen, unless the player moves on first.
+          if (this.endT > 1.4 || (this.endT > 0.3 && this.input.confirmPressed())) this.openEntry();
+          break;
+        }
+        if (this.endT > 0.3 && this.input.confirmPressed()) {
           this.sound.sfx('select');
-          this.state = 'title';
-          this.resetRun();
-          this.sound.music('title');
+          this.toTitle();
+        }
+        break;
+
+      case 'ranks':
+        this.fx.update(dt);
+        this.endT += dt;
+        if (this.endT > 0.8 && this.input.confirmPressed()) {
+          this.sound.sfx('select');
+          this.toTitle();
         }
         break;
 
@@ -506,6 +626,7 @@ class Game {
     else if (this.state === 'clear') this.hud.levelClear(ctx, this);
     else if (this.state === 'gameover') this.hud.gameOver(ctx, this);
     else if (this.state === 'victory') this.hud.victory(ctx, this);
+    else if (this.state === 'ranks') this.hud.ranks(ctx, this);
   }
 
   drawLayer(ctx, cam, test) {
@@ -529,6 +650,12 @@ class Game {
       const v = (x / 16) % 2;
       ctx.drawImage(ts.solid[1][v], x, VIEW_H - 32);   // mask 1 = open top
       ctx.drawImage(ts.solid[0][v], x, VIEW_H - 16);   // mask 0 = fully buried
+    }
+    if (this.titlePage === 1 && this.scores.boards) {
+      this.hud.titleScores(ctx, this);
+      this.hud.titleGoblin(ctx, this);
+      this.fx.drawFlash(ctx, VIEW_W, VIEW_H);
+      return;
     }
     // Scrim first, then the goblin, so the character stays in front of it.
     this.hud.titleScrim(ctx);

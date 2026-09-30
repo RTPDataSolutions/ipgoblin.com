@@ -513,6 +513,23 @@ body {
 
 .arcade-card .btn { margin-top: auto; }
 
+.arcade-leader {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--beige);
+}
+
+.arcade-leader strong { color: var(--gold); letter-spacing: 0.06em; }
+
+.arcade-scores {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.arcade-scores a { color: var(--slime); }
+
 /* ---------- toast ---------- */
 
 .toast {

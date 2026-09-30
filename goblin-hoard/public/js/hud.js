@@ -5,9 +5,15 @@
 
 import { C } from './art.js';
 import { drawSprite } from './entities.js';
+import { wipesIn } from './scores.js';
 
 const W = 384;
 const H = 216;
+
+const pad7 = (n) => String(n).padStart(7, '0');
+
+/** Whether the "press enter" line should show on the game over screens. */
+const promptVisible = (g) => ['none', 'offline', 'skipped'].includes(g.post);
 
 export class Hud {
   constructor(font, icons) {
@@ -183,6 +189,9 @@ export class Hud {
     });
 
     f.draw(ctx, 'IPGOBLIN.COM', W - 4, 205, { color: C.skin, align: 'right', shadow: '#000000' });
+    if (g.scores.boards && !g.input.usedTouch) {
+      f.draw(ctx, '< > HIGH SCORES', 4, 205, { color: C.skin, shadow: '#000000' });
+    }
   }
 
   levelIntro(ctx, g) {
@@ -228,7 +237,10 @@ export class Hud {
         color: C.cyanL, align: 'center', wave: g.time * 5, waveAmp: 1,
       });
     }
-    if (Math.floor(g.time * 1.8) % 2 === 0) {
+    if (g.post === 'offline') {
+      f.draw(ctx, 'THE SCOREBOARD IS OUT OF REACH', W / 2, 154, { color: C.skinD, align: 'center' });
+    }
+    if (promptVisible(g) && Math.floor(g.time * 1.8) % 2 === 0) {
       f.draw(ctx, g.input.usedTouch ? 'TAP TO TRY AGAIN' : 'PRESS ENTER TO TRY AGAIN', W / 2, 168, {
         color: C.skinL, align: 'center', shadow: '#000000',
       });
@@ -253,7 +265,10 @@ export class Hud {
     rows.forEach((r, i) => f.draw(ctx, r, W / 2, 104 + i * 12, {
       color: i === 3 ? C.cyanL : C.skinL, align: 'center', shadow: '#000000',
     }));
-    if (Math.floor(g.time * 1.8) % 2 === 0) {
+    if (g.post === 'offline') {
+      f.draw(ctx, 'THE SCOREBOARD IS OUT OF REACH', W / 2, 156, { color: C.skinD, align: 'center' });
+    }
+    if (promptVisible(g) && Math.floor(g.time * 1.8) % 2 === 0) {
       f.draw(ctx, g.input.usedTouch ? 'TAP TO PLAY AGAIN' : 'PRESS ENTER TO PLAY AGAIN', W / 2, 168, {
         color: C.goldL, align: 'center', shadow: '#000000',
       });
@@ -267,6 +282,114 @@ export class Hud {
       color: C.goldL, align: 'center', scale: 3, shadow: '#000000', wave: g.time * 4, waveAmp: 1,
     });
     f.draw(ctx, `+${g.clearBonus} CLEAR BONUS`, W / 2, 110, { color: C.skinL, align: 'center' });
+  }
+
+  /* ---------------------------------------------------------- high scores */
+
+  /** The title screen's other page: both boards, attract-loop style. */
+  titleScores(ctx, g) {
+    const f = this.font;
+    const b = g.scores.boards;
+    this.dim(ctx, 0.74);
+    f.draw(ctx, 'HALL OF HOARDERS', W / 2, 6, {
+      color: C.gold, align: 'center', scale: 2, outline: '#0b1207',
+    });
+    f.draw(ctx, `THIS WEEK'S BOARD IS WIPED IN ${wipesIn(g.scores.resetIn)}`, W / 2, 23, {
+      color: C.skinL, align: 'center', shadow: '#000000',
+    });
+    this.boards(ctx, g, b);
+    if (b.champion) {
+      f.draw(ctx, `LAST WEEK'S CHAMPION  ${b.champion.name}  ${pad7(b.champion.score)}`, W / 2, 162, {
+        color: C.skin, align: 'center', shadow: '#000000',
+      });
+    }
+    if (Math.floor(g.time * 1.8) % 2 === 0) {
+      f.draw(ctx, g.input.usedTouch ? 'TAP TO START' : 'PRESS ENTER TO START', W / 2, 176, {
+        color: C.goldL, align: 'center', scale: 2, shadow: '#000000',
+      });
+    }
+  }
+
+  /** After posting: where the run landed, with your line lit up. */
+  ranks(ctx, g) {
+    const f = this.font;
+    const res = g.posted?.week ? g.posted : g.scores.boards;
+    this.dim(ctx, 0.84);
+    const wk = res?.week?.you;
+    const all = res?.all?.you;
+    f.draw(ctx, wk ? `#${wk.rank} THIS WEEK` : 'SCORE POSTED', W / 2, 6, {
+      color: C.cyanL, align: 'center', scale: 2, outline: '#0b1207',
+    });
+
+    const improved = g.posted?.posted?.improved;
+    let flair = '';
+    if (improved?.all) flair = 'NEW PERSONAL BEST!';
+    else if (improved?.week) flair = 'NEW BEST THIS WEEK!';
+    else if (improved) flair = 'YOUR BEST STILL STANDS';
+    const sub = [all ? `#${all.rank} ALL TIME` : '', flair].filter(Boolean).join(' - ');
+    f.draw(ctx, sub, W / 2, 23, {
+      color: improved?.all || improved?.week ? C.goldL : C.skinL, align: 'center', shadow: '#000000',
+    });
+
+    if (res?.week) this.boards(ctx, g, res);
+    f.draw(ctx, 'EVERY BOARD LIVES AT SCORES.IPGOBLIN.COM', W / 2, 162, {
+      color: C.skin, align: 'center', shadow: '#000000',
+    });
+    if (Math.floor(g.time * 1.8) % 2 === 0) {
+      f.draw(ctx, g.input.usedTouch ? 'TAP TO CONTINUE' : 'PRESS ENTER TO CONTINUE', W / 2, 180, {
+        color: C.goldL, align: 'center', shadow: '#000000',
+      });
+    }
+  }
+
+  /** This week on the left, all time on the right. */
+  boards(ctx, g, b) {
+    this.boardColumn(ctx, g, 16, 'THIS WEEK', b.week);
+    this.boardColumn(ctx, g, 198, 'ALL TIME', b.all);
+  }
+
+  /**
+   * One board, ten lines. If you are on it but below the tenth line, the
+   * last two lines become a gap and your own line, so you always see yours.
+   */
+  boardColumn(ctx, g, x0, label, board) {
+    const f = this.font;
+    const mid = x0 + 85;
+    f.draw(ctx, label, mid, 35, { color: C.goldL, align: 'center', shadow: '#000000' });
+    ctx.fillStyle = C.goldD;
+    ctx.fillRect(x0 + 4, 44, 162, 1);
+
+    if (!board.top.length) {
+      f.draw(ctx, 'NOBODY YET', mid, 70, { color: C.skinL, align: 'center', shadow: '#000000' });
+      f.draw(ctx, 'THE TOP SPOT IS', mid, 88, { color: C.skinD, align: 'center' });
+      f.draw(ctx, 'UP FOR GRABS', mid, 98, { color: C.skinD, align: 'center' });
+      return;
+    }
+
+    let rows = board.top.slice(0, 10);
+    if (board.you && !rows.some((e) => e.you)) rows = [...rows.slice(0, 8), null, { ...board.you, you: true }];
+
+    rows.forEach((e, i) => {
+      const y = 49 + i * 11;
+      if (!e) {
+        f.draw(ctx, '. . .', mid, y, { color: C.skinD, align: 'center' });
+        return;
+      }
+      if (e.you) {
+        ctx.save();
+        ctx.globalAlpha = 0.55 + 0.25 * Math.sin(g.time * 5);
+        ctx.fillStyle = C.cyanD;
+        ctx.fillRect(x0, y - 2, 170, 11);
+        ctx.restore();
+      }
+      const name = e.you ? C.cyanL : e.rank === 1 ? C.gold : C.skinL;
+      f.draw(ctx, String(e.rank), x0 + 16, y, { color: e.you ? C.cyanL : C.skinD, align: 'right', shadow: '#000000' });
+      f.draw(ctx, e.name, x0 + 22, y, { color: name, shadow: '#000000' });
+      f.draw(ctx, pad7(e.score), x0 + 142, y, { color: e.you ? C.cyanL : C.goldL, align: 'right', shadow: '#000000' });
+      f.draw(ctx, e.won ? 'WON' : `L${e.level}`, x0 + 168, y, {
+        color: e.won ? C.gold : C.skin, align: 'right', shadow: '#000000',
+      });
+    });
   }
 
   /** Little goblin standing on the title-screen ledge. */

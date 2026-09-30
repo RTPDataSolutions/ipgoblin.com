@@ -30,6 +30,20 @@
         <button class="tbtn tbtn-jump" data-key="jump"   type="button" aria-label="Jump">&#9650;</button>
       </div>
     </div>
+
+    <form id="entry" class="entry" hidden novalidate autocomplete="off" aria-labelledby="entry-title">
+      <p id="entry-title" class="entry-title">CARVE YOUR NAME</p>
+      <p class="entry-score">SCORE <span id="entry-score">0</span></p>
+      <div class="entry-row">
+        <input id="entry-name" class="entry-name" type="text" name="name" maxlength="10"
+               autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="send"
+               aria-label="Your name for the high score table">
+        <button id="entry-post" class="entry-btn entry-go" type="submit">POST</button>
+        <button id="entry-skip" class="entry-btn" type="button">SKIP</button>
+      </div>
+      <p id="entry-msg" class="entry-msg" role="status" aria-live="polite"></p>
+      <p class="entry-note">Public, at scores.ipgoblin.com. Nothing else is kept.</p>
+    </form>
   </div>
 
   <div class="chrome">

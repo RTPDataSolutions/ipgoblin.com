@@ -23,6 +23,7 @@ Live at **https://hoard.ipgoblin.com**.
 | X / J | Whip |
 | P / Esc | Pause |
 | M | Mute |
+| ← / → on the title | Flip to the high score tables |
 
 A gamepad works if one is plugged in, and touch controls appear on coarse-pointer devices.
 
@@ -46,7 +47,33 @@ also drop on an enemy's head. Chain kills within two and a half seconds to build
 
 **Scoring** — 25 a coin, 250 a gem, 2500 a goblin idol (there is one hidden up high), 150–500 an
 enemy times the chain multiplier, 5000 the boss, plus a clear bonus for leftover health and lives.
-The high score is kept in `localStorage`.
+Your own best is kept in `localStorage`.
+
+## High scores
+
+Every run that scores can go on the world tables at
+[scores.ipgoblin.com](https://scores.ipgoblin.com): one wiped every Monday, one all time, one line
+per player. The tables themselves are kept by the `scores-worker/` Worker; the repository README's
+*High scores* section covers the service, its API and how scores are checked.
+
+In the game:
+
+- **The title screen** alternates with the *Hall of Hoarders*, the way an arcade cabinet's attract
+  loop does, and ← / → flip it by hand.
+- **When a run ends** with points, a form over the canvas offers to carve a name into the tables.
+  It remembers your name, so after the first time posting is a single Enter; the first time it
+  suggests a goblin name you can accept or type over. Esc skips. On a gamepad, A posts and Start
+  skips.
+- **After posting**, a ranks screen shows where the run landed on both tables, with your line lit
+  up even when it is far below the top ten.
+
+The form is real HTML rather than text drawn on the canvas, so phones get their keyboard and screen
+readers get a label. While it has focus, `js/input.js` leaves keys to it, so typing a name never
+steers the goblin; key releases still count, so a key held when the run ended does not stay stuck.
+
+Names can only use characters the bitmap font can draw (`A-Z 0-9 . _ ! ? -`). A run asks the
+scoreboard for a token when it starts, and if that fails the game plays exactly as before and game
+over says the scoreboard is out of reach.
 
 ## How it is built
 
@@ -63,7 +90,9 @@ The high score is kept in `localStorage`.
 | `js/fx.js` | Particles, floating numbers, screen shake, hit-stop |
 | `js/audio.js` | WebAudio chiptune engine and sound effects |
 | `js/input.js` | Keyboard, gamepad and touch folded into one action model |
-| `js/hud.js` | HUD and the full-screen states |
+| `js/hud.js` | HUD and the full-screen states, including the high score tables |
+| `js/scores.js` | Talks to scores.ipgoblin.com: the tables, run tokens, posting |
+| `js/entry.js` | The name form shown when a run ends |
 | `js/main.js` | Boot, game state machine, fixed-timestep loop |
 
 ### Why there are no image files
@@ -157,6 +186,10 @@ Or serve `public/` with anything — the game is ES modules, so it needs a serve
 ```bash
 cd public && python3 -m http.server 8799
 ```
+
+Served from `localhost` or `127.0.0.1`, the game talks to a local scores Worker on port 8789
+instead of scores.ipgoblin.com. Start one with `npm run dev` in `../scores-worker` (its first-time
+setup is in the repository README); without it the game still plays, just without the tables.
 
 ## Deploy
 
