@@ -516,26 +516,71 @@ any tracking code on the site. There are two ways to read them.
 A password-protected dashboard, served by the `ipgoblin-stats` Worker in
 `stats-worker/`. Visit <https://stats.ipgoblin.com> and the browser will ask
 for a username and password: the username is `goblin`, the password is the
-`STATS_PASSWORD` secret. Add `?format=json` for the raw numbers.
+`STATS_PASSWORD` secret. Add `?format=json` to any page for the raw numbers.
 
-It shows four sections:
+The dashboard shows seven sections:
 
   * **Traffic, last 7 days** — requests, page views, uniques and bytes per day.
   * **Last 24 hours** — requests split by hostname and by country.
+  * **How calls are made, last 24 hours** — the top calls (method, host, path
+    and status), then how they arrive: method, status, HTTP version, TLS
+    version, TLS key exchange, content type, cache, security action, browser,
+    OS, device, verified bots, the Cloudflare edge that answered, the networks
+    they come from, and the raw user agents.
+  * **Security rules that fired, last 24 hours** — which Cloudflare rules
+    blocked or challenged calls, and how often.
   * **Visitor stream, last 24 hours** — one row per unique visitor.
+  * **Latest calls** — the newest calls one by one, leaving out the
+    dashboard's own.
   * **API worker, last 24 hours** — `ipgoblin-api` requests and errors by status.
 
 The visitor stream collapses the edge data to one row per client IP, so
 somebody who requested twenty URLs is a single line with a hit count rather
-than twenty lines. Each row carries the hostname and IP, country, a shortened
-user agent, device type, hit count, how many distinct paths they touched, and
-when they were last seen.
+than twenty lines. Each row carries the hostname and IP, country, network
+(ASN), a shortened user agent, device type, hit count, how many distinct paths
+they touched, and when they were last seen.
 
 Hostnames are resolved live over DNS-over-HTTPS for the busiest visitors only,
 capped so the page stays inside the Worker subrequest budget. Most residential
 addresses have no PTR record and show as *no reverse DNS*; hosting providers
 and scanners usually do resolve, which is what makes the column worth having.
 Lookups are batched, individually timed out, and never fatal.
+
+#### The call explorer
+
+Every hostname, country, IP, call and breakdown value on the dashboard is a
+link into the call explorer at `/calls`, which drills into any slice of the
+traffic:
+
+    /calls?ip=203.0.113.9                    everything one visitor did
+    /calls?host=api.ipgoblin.com             every call to the API
+    /calls?host=api.ipgoblin.com&path=/json  one endpoint
+    /calls?action=block&window=7d            what Cloudflare blocked this week
+    /calls?agent=                            calls that sent no user agent
+
+Filters combine. The parameters are `ip`, `host`, `path`, `method`, `status`,
+`protocol`, `tls`, `type`, `cache`, `action`, `source`, `country`, `device`,
+`browser`, `os`, `bot` and `agent`, each an exact match. `window` is `24h`
+(the default), `7d` or `30d`.
+
+Each explorer page shows the same breakdowns for its slice, plus the top
+callers with their reverse DNS and network, the security rules that fired,
+and the calls themselves, 200 to a page, newest first. Open a call to see:
+
+  * the request as it reached the edge: the request line, or the HTTP/2 and
+    HTTP/3 pseudo-headers, with the host, query string and user agent;
+  * when, from which IP, country, device and network (ASN);
+  * the scheme, HTTP version and TLS version it came over;
+  * the status, content type and cache status it got back, and whether the
+    origin was contacted and how long it took;
+  * for blocked calls, the Cloudflare rule that stopped it and its ray ID,
+    which can be looked up under **Security -> Events**.
+
+The call list only holds what Cloudflare keeps. When traffic is busy it stores
+a sample of requests (1 in 3 is typical here, more on longer windows) and
+scales the counts up, so counts are estimates and each page says how many
+calls were kept one by one. Headers other than the user agent, and request
+bodies, are never recorded.
 
 It lives in its own Worker rather than as a route on `api.ipgoblin.com` so
 that the Cloudflare API token is not sitting on the public API surface. The
@@ -561,8 +606,10 @@ there is no "Zone Analytics" entry in that group. Scope it to Account
 Resources *Include -> All accounts* and Zone Resources
 *Include -> Specific zone -> ipgoblin.com*.
 
-The token cannot change anything, cannot read logs, and cannot touch DNS. It
-is stored only as a Worker secret and is never committed.
+The token cannot change anything, cannot pull Cloudflare's full request logs
+(Logpull or Logpush; the call explorer only sees the sampled requests that
+analytics keeps), and cannot touch DNS. It is stored only as a Worker secret
+and is never committed.
 
 Deploy changes with `npx wrangler deploy` from `stats-worker/`, and check what
 is set with `npx wrangler secret list`.
@@ -584,22 +631,32 @@ The same data is in Cloudflare under **ipgoblin.com -> Analytics & Logs
 Free-plan limits, which both tools are written to:
 
   * the daily dataset keeps **7 days**;
-  * the detailed dataset behind the country split and the visitor stream only
-    answers for a **24-hour** window, so the visitor stream cannot look further
-    back than that;
-  * some fields are paid-only. Client ASN and referer host are not readable on
-    the free plan, which is why the visitor stream infers what it can from the
-    user agent and reverse DNS instead.
+  * the detailed request datasets answer for up to **30 days** (checked
+    against the zone's GraphQL `settings` node in September 2026; earlier they
+    stopped at 24 hours). The dashboard's detailed sections still cover the
+    last 24 hours, and the call explorer offers 24 hours, 7 days or 30 days;
+  * some fields are paid-only or only exist on some datasets. Client ASN
+    cannot be grouped on, but it is readable on individual requests, so the
+    dashboard reads a light pass of those to put a network against each
+    visitor. Referer is only recorded on security events, so it is not shown.
+    The edge colo and TLS key exchange can be counted but not filtered on;
+  * one GraphQL request may carry only about 50 dataset queries, and a Worker
+    on the free plan may make 50 subrequests per request. The dashboard spends
+    8 GraphQL requests and up to 36 reverse-DNS lookups; an explorer page
+    spends 3 and up to 10.
 
 On privacy: the site still runs no tracking code, sets no cookies, and stores
 nothing itself — the "nothing is logged here" promise on the page is about the
 site. The numbers here come from Cloudflare's own edge analytics, which every
 proxied request produces regardless. The daily and country sections are pure
-aggregates, but the visitor stream does show individual client IP addresses and
-resolved hostnames for the last 24 hours, so treat that page as sensitive and
-keep it behind its password.
+aggregates, but the visitor stream and the call explorer show individual client
+IP addresses, resolved hostnames, full user agents and query strings, which can
+carry anything a caller chose to send. Treat those pages as sensitive and keep
+them behind their password.
 
 A fair share of the non-US traffic is bots and scanners rather than people. The
 visitor stream makes this obvious: look for agents like `l9scan`, `Baiduspider`
-or `zgrab`, hostnames under `scan.leakix.org`, and visitors whose path count is
-far higher than a human would ever produce.
+or `zgrab`, hostnames under `scan.leakix.org`, networks belonging to hosting
+providers, and visitors whose path count is far higher than a human would ever
+produce. The call explorer shows what they were after: most calls to
+`api.ipgoblin.com` are WordPress and CVE probes rather than IP lookups.
