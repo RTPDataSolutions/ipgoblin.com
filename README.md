@@ -95,11 +95,44 @@ billing issue"* — Pages is instead served from the `gh-pages` branch, which ho
 ./scripts/publish-gh-pages.sh
 ```
 
-That script copies `site/` to the `gh-pages` branch and asks Pages to rebuild. It also stamps
-`styles.css` and `app.js` references with a content hash, because Cloudflare caches those files at
-the edge for four hours and a plain redeploy would keep serving the old ones. HTML is never cached,
-so the new hashes take effect immediately. Only the published copy is rewritten; `site/` stays
-clean for local development.
+That script copies `site/` to the `gh-pages` branch and asks Pages to rebuild. It stamps every
+`.css` and `.js` reference with a content hash, because Cloudflare caches those files at the edge
+for four hours and a plain redeploy would keep serving the old ones. The asset list is discovered
+rather than hardcoded, so a newly added script is cache-busted automatically. HTML is never
+cached, so the new hashes take effect immediately. Only the published copy is rewritten; `site/`
+stays clean for local development.
+
+#### The two safety checks
+
+The push is a **force-push of whatever is in `site/` right now**. It is not a merge, so anything
+missing locally is removed from the live site. Two checks guard that, and both have caught a real
+incident:
+
+| Check | Refuses when | Why |
+| --- | --- | --- |
+| Repository | `origin` is not `RTPDataSolutions/ipgoblin.com` | `REPO` is hardcoded, so a copy of this script in a scratch clone would force-push that clone's `site/` over production. A throwaway test fixture once replaced the live site this way. |
+| Staleness | `origin/master` has `site/` changes this tree lacks | Publishing from a branch that predates someone else's work silently reverts it. A stale publish once removed the goblin arcade from the live site. |
+
+The staleness check names the exact files that would be overwritten and the commits you are
+missing, so the fix is usually just:
+
+```sh
+git fetch origin && git rebase origin/master
+```
+
+Options:
+
+```sh
+./scripts/publish-gh-pages.sh --check   # report staleness, publish nothing
+./scripts/publish-gh-pages.sh --force   # skip the staleness check
+```
+
+`--force` does **not** bypass the repository check. To publish from a fork or a test fixture, set
+the target explicitly:
+
+```sh
+IPGOBLIN_PUBLISH_REPO=owner/repo ./scripts/publish-gh-pages.sh
+```
 
 Once Actions works again, switch Pages back to the workflow build:
 
